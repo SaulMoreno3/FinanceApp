@@ -5,26 +5,28 @@ import {
     BarChart,
     CartesianGrid,
     Cell,
-    Legend,
     Pie,
     PieChart,
+    ReferenceLine,
     ResponsiveContainer,
     Tooltip,
     XAxis,
     YAxis,
 } from "recharts";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { ArrowUpRight, CircleDollarSign, Layers3 } from "lucide-react";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import type { CategoryBreakdown } from "@/components/net-worth/net-worth.types";
 import type { Holding } from "@/components/portfolio/portfolio.types";
 import type { SalaryRecord } from "@/components/salary/salary.types";
 
-const COLORS = ["#2563eb", "#7c3aed", "#0891b2", "#059669", "#d97706", "#dc2626", "#db2777"];
+const COLORS = ["#7c3aed", "#2563eb", "#06b6d4", "#10b981", "#f59e0b", "#f43f5e", "#ec4899"];
 const chartTextColor = "hsl(var(--muted-foreground))";
 const chartGridColor = "hsl(var(--border))";
 const chartTooltipStyle = {
     backgroundColor: "hsl(var(--popover))",
     border: "1px solid hsl(var(--border))",
-    borderRadius: "8px",
+    borderRadius: "12px",
+    boxShadow: "0 18px 50px -22px rgba(0, 0, 0, 0.7)",
     color: "hsl(var(--popover-foreground))",
 };
 
@@ -34,86 +36,163 @@ const currency = new Intl.NumberFormat("en-GB", {
     maximumFractionDigits: 0,
 });
 
+const compactCurrency = new Intl.NumberFormat("en-GB", {
+    style: "currency",
+    currency: "EUR",
+    notation: "compact",
+    maximumFractionDigits: 1,
+});
+
 function formatCurrency(value: number | string | undefined) {
     return currency.format(Number(value ?? 0));
 }
 
 function EmptyChart({ message }: { message: string }) {
-    return <p className="flex h-[280px] items-center justify-center text-sm text-muted-foreground">{message}</p>;
+    return (
+        <div className="flex h-[290px] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border/70 bg-muted/20 text-center">
+            <div className="rounded-full bg-muted p-3"><Layers3 className="h-5 w-5 text-muted-foreground" /></div>
+            <p className="text-sm text-muted-foreground">{message}</p>
+        </div>
+    );
+}
+
+function ChartShell({
+    title,
+    description,
+    icon: Icon,
+    children,
+    className = "",
+}: {
+    title: string;
+    description: string;
+    icon: typeof Layers3;
+    children: React.ReactNode;
+    className?: string;
+}) {
+    return (
+        <Card className={`relative overflow-hidden border-border/70 bg-card/80 shadow-sm ${className}`}>
+            <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-primary/[0.08] to-transparent" />
+            <CardHeader className="relative flex-row items-start justify-between space-y-0 pb-3">
+                <div className="space-y-1.5">
+                    <CardTitle className="text-base">{title}</CardTitle>
+                    <CardDescription>{description}</CardDescription>
+                </div>
+                <div className="rounded-xl border border-primary/15 bg-primary/10 p-2.5 text-primary">
+                    <Icon className="h-4 w-4" />
+                </div>
+            </CardHeader>
+            <CardContent className="relative">{children}</CardContent>
+        </Card>
+    );
 }
 
 export function AssetAllocationChart({ categories }: { categories: CategoryBreakdown[] }) {
     const chartData = categories
         .filter((category) => category.totalValue > 0)
-        .map((category) => ({ name: category.category, value: category.totalValue }));
+        .sort((left, right) => right.totalValue - left.totalValue)
+        .map((category) => ({
+            name: category.category,
+            value: category.totalValue,
+            count: category.count,
+        }));
+    const total = chartData.reduce((sum, category) => sum + category.value, 0);
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Asset allocation</CardTitle>
-            </CardHeader>
-            <CardContent>
-                {chartData.length === 0 ? <EmptyChart message="No net worth data" /> : (
-                    <ResponsiveContainer width="100%" height={280}>
-                        <PieChart>
-                            <Pie
-                                data={chartData}
-                                dataKey="value"
-                                nameKey="name"
-                                cx="50%"
-                                cy="50%"
-                                innerRadius={68}
-                                outerRadius={104}
-                                paddingAngle={3}
-                                stroke="hsl(var(--background))"
-                                strokeWidth={3}
-                            >
-                                {chartData.map((entry, index) => (
-                                    <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
-                                ))}
-                            </Pie>
-                            <Tooltip formatter={(value) => formatCurrency(Number(value))} contentStyle={chartTooltipStyle} />
-                            <Legend verticalAlign="bottom" height={32} />
-                        </PieChart>
-                    </ResponsiveContainer>
-                )}
-            </CardContent>
-        </Card>
+        <ChartShell title="Asset allocation" description="How your net worth is distributed" icon={Layers3}>
+            {chartData.length === 0 ? <EmptyChart message="No net worth data" /> : (
+                <div className="grid min-h-[300px] items-center gap-4 sm:grid-cols-[minmax(220px,0.9fr)_1.1fr]">
+                    <div className="relative mx-auto h-[250px] w-full max-w-[280px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <PieChart>
+                                <Pie
+                                    data={chartData}
+                                    dataKey="value"
+                                    nameKey="name"
+                                    cx="50%"
+                                    cy="50%"
+                                    innerRadius={74}
+                                    outerRadius={108}
+                                    cornerRadius={8}
+                                    paddingAngle={4}
+                                    stroke="transparent"
+                                >
+                                    {chartData.map((entry, index) => (
+                                        <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
+                                    ))}
+                                </Pie>
+                                <Tooltip formatter={(value) => formatCurrency(Number(value))} contentStyle={chartTooltipStyle} />
+                            </PieChart>
+                        </ResponsiveContainer>
+                        <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+                            <span className="text-[11px] font-medium uppercase tracking-[0.2em] text-muted-foreground">Total</span>
+                            <span className="mt-1 text-2xl font-bold tracking-tight">{compactCurrency.format(total)}</span>
+                            <span className="mt-1 text-xs text-muted-foreground">{chartData.reduce((sum, item) => sum + item.count, 0)} assets</span>
+                        </div>
+                    </div>
+                    <div className="space-y-2.5">
+                        {chartData.slice(0, 6).map((item, index) => {
+                            const percentage = total > 0 ? (item.value / total) * 100 : 0;
+                            return (
+                                <div key={item.name} className="group flex items-center gap-3 rounded-xl border border-transparent px-3 py-2 transition-colors hover:border-border/70 hover:bg-muted/30">
+                                    <span className="h-2.5 w-2.5 shrink-0 rounded-full shadow-[0_0_12px_currentColor]" style={{ backgroundColor: COLORS[index % COLORS.length], color: COLORS[index % COLORS.length] }} />
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex items-center justify-between gap-3 text-sm">
+                                            <span className="truncate font-medium">{item.name}</span>
+                                            <span className="font-semibold tabular-nums">{percentage.toFixed(1)}%</span>
+                                        </div>
+                                        <div className="mt-0.5 flex items-center justify-between text-xs text-muted-foreground">
+                                            <span>{item.count} asset{item.count === 1 ? "" : "s"}</span>
+                                            <span>{formatCurrency(item.value)}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+        </ChartShell>
     );
 }
 
 export function PortfolioExposureChart({ holdings }: { holdings: Holding[] }) {
-    const chartData = holdings
+    const openHoldings = holdings
         .filter((holding) => holding.remainingShares > 0)
-        .sort((left, right) => right.totalCostBasis - left.totalCostBasis)
-        .slice(0, 8)
-        .map((holding) => {
-            const label = holding.name || holding.symbol;
-            return {
-            symbol: label.length > 14 ? `${label.slice(0, 14)}…` : label,
+        .sort((left, right) => right.totalCostBasis - left.totalCostBasis);
+    const total = openHoldings.reduce((sum, holding) => sum + holding.totalCostBasis, 0);
+    const chartData = openHoldings.slice(0, 8).map((holding) => {
+        const label = holding.name || holding.symbol;
+        return {
+            symbol: label.length > 18 ? `${label.slice(0, 18)}…` : label,
             cost: holding.totalCostBasis,
-            };
-        });
+            weight: total > 0 ? (holding.totalCostBasis / total) * 100 : 0,
+        };
+    });
 
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Exposure by position</CardTitle>
-            </CardHeader>
-            <CardContent>
-                {chartData.length === 0 ? <EmptyChart message="No open positions" /> : (
-                    <ResponsiveContainer width="100%" height={280}>
-                        <BarChart data={chartData} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
-                            <CartesianGrid stroke={chartGridColor} strokeDasharray="3 3" vertical={false} />
-                            <XAxis dataKey="symbol" tick={{ fill: chartTextColor, fontSize: 11 }} axisLine={false} tickLine={false} />
-                            <YAxis tick={{ fill: chartTextColor, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(value) => `${Math.round(value / 1000)}k`} />
-                            <Tooltip formatter={(value) => formatCurrency(Number(value))} contentStyle={chartTooltipStyle} />
-                            <Bar dataKey="cost" name="Cost" fill="#2563eb" radius={[6, 6, 0, 0]} />
-                        </BarChart>
-                    </ResponsiveContainer>
-                )}
-            </CardContent>
-        </Card>
+        <ChartShell title="Portfolio exposure" description="Largest open positions by cost basis" icon={ArrowUpRight}>
+            {chartData.length === 0 ? <EmptyChart message="No open positions" /> : (
+                <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={chartData} layout="vertical" margin={{ top: 4, right: 20, left: 12, bottom: 4 }}>
+                        <defs>
+                            <linearGradient id="exposureBar" x1="0" y1="0" x2="1" y2="0">
+                                <stop offset="0%" stopColor="#7c3aed" />
+                                <stop offset="100%" stopColor="#2563eb" />
+                            </linearGradient>
+                        </defs>
+                        <CartesianGrid stroke={chartGridColor} strokeDasharray="4 8" horizontal={false} />
+                        <XAxis type="number" tick={{ fill: chartTextColor, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(value) => compactCurrency.format(value)} />
+                        <YAxis type="category" dataKey="symbol" width={126} tick={{ fill: chartTextColor, fontSize: 11 }} axisLine={false} tickLine={false} />
+                        <Tooltip
+                            formatter={(value, name) => name === "Cost basis" ? formatCurrency(Number(value)) : `${Number(value).toFixed(1)}%`}
+                            contentStyle={chartTooltipStyle}
+                            cursor={{ fill: "hsl(var(--muted) / 0.3)" }}
+                        />
+                        <Bar dataKey="cost" name="Cost basis" fill="url(#exposureBar)" radius={[0, 8, 8, 0]} barSize={17} />
+                    </BarChart>
+                </ResponsiveContainer>
+            )}
+        </ChartShell>
     );
 }
 
@@ -138,37 +217,58 @@ export function SalaryTrendChart({ salaries }: { salaries: SalaryRecord[] }) {
     const chartData = [...monthly.entries()]
         .sort(([left], [right]) => left.localeCompare(right))
         .map(([, value]) => value);
+    const averageNet = chartData.length > 0
+        ? chartData.reduce((sum, item) => sum + item.net, 0) / chartData.length
+        : 0;
+    const totalGross = chartData.reduce((sum, item) => sum + item.gross, 0);
+    const totalNet = chartData.reduce((sum, item) => sum + item.net, 0);
 
     return (
-        <Card className="lg:col-span-2">
-            <CardHeader>
-                <CardTitle>Monthly salary trend</CardTitle>
-            </CardHeader>
-            <CardContent>
-                {chartData.length === 0 ? <EmptyChart message="No salaries for the current year" /> : (
-                    <ResponsiveContainer width="100%" height={300}>
-                        <AreaChart data={chartData} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+        <ChartShell title="Income momentum" description={`Gross and net monthly income · ${currentYear}`} icon={CircleDollarSign} className="lg:col-span-2">
+            {chartData.length === 0 ? <EmptyChart message="No salaries for the current year" /> : (
+                <>
+                    <div className="mb-5 flex flex-wrap gap-3">
+                        <div className="rounded-xl border border-violet-500/15 bg-violet-500/10 px-4 py-2.5">
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-violet-400">Gross YTD</p>
+                            <p className="mt-1 text-lg font-bold">{formatCurrency(totalGross)}</p>
+                        </div>
+                        <div className="rounded-xl border border-emerald-500/15 bg-emerald-500/10 px-4 py-2.5">
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-400">Net YTD</p>
+                            <p className="mt-1 text-lg font-bold">{formatCurrency(totalNet)}</p>
+                        </div>
+                        <div className="rounded-xl border border-border/70 bg-muted/25 px-4 py-2.5">
+                            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Average net</p>
+                            <p className="mt-1 text-lg font-bold">{formatCurrency(averageNet)}</p>
+                        </div>
+                    </div>
+                    <ResponsiveContainer width="100%" height={310}>
+                        <AreaChart data={chartData} margin={{ top: 12, right: 8, left: 8, bottom: 2 }}>
                             <defs>
                                 <linearGradient id="grossSalary" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#7c3aed" stopOpacity={0.3} />
-                                    <stop offset="95%" stopColor="#7c3aed" stopOpacity={0} />
+                                    <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.38} />
+                                    <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0} />
                                 </linearGradient>
                                 <linearGradient id="netSalary" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#059669" stopOpacity={0.3} />
-                                    <stop offset="95%" stopColor="#059669" stopOpacity={0} />
+                                    <stop offset="0%" stopColor="#10b981" stopOpacity={0.34} />
+                                    <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
                                 </linearGradient>
                             </defs>
-                            <CartesianGrid stroke={chartGridColor} strokeDasharray="3 3" vertical={false} />
+                            <CartesianGrid stroke={chartGridColor} strokeDasharray="4 8" vertical={false} />
                             <XAxis dataKey="month" tick={{ fill: chartTextColor, fontSize: 11 }} axisLine={false} tickLine={false} />
-                            <YAxis tick={{ fill: chartTextColor, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(value) => `${Math.round(value / 1000)}k`} />
-                            <Tooltip formatter={(value) => formatCurrency(Number(value))} contentStyle={chartTooltipStyle} />
-                            <Legend />
-                            <Area type="monotone" dataKey="gross" name="Gross" stroke="#7c3aed" fill="url(#grossSalary)" strokeWidth={2} />
-                            <Area type="monotone" dataKey="net" name="Net" stroke="#059669" fill="url(#netSalary)" strokeWidth={2} />
+                            <YAxis tick={{ fill: chartTextColor, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(value) => compactCurrency.format(value)} />
+                            <Tooltip formatter={(value) => formatCurrency(Number(value))} contentStyle={chartTooltipStyle} cursor={{ stroke: "hsl(var(--primary))", strokeOpacity: 0.3 }} />
+                            <ReferenceLine y={averageNet} stroke="#10b981" strokeDasharray="5 5" strokeOpacity={0.45} />
+                            <Area type="monotone" dataKey="gross" name="Gross" stroke="#8b5cf6" fill="url(#grossSalary)" strokeWidth={2.5} activeDot={{ r: 5, strokeWidth: 0 }} />
+                            <Area type="monotone" dataKey="net" name="Net" stroke="#10b981" fill="url(#netSalary)" strokeWidth={2.5} activeDot={{ r: 5, strokeWidth: 0 }} />
                         </AreaChart>
                     </ResponsiveContainer>
-                )}
-            </CardContent>
-        </Card>
+                    <div className="mt-1 flex items-center justify-end gap-5 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-violet-500" />Gross</span>
+                        <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-emerald-500" />Net</span>
+                        <span className="flex items-center gap-2"><span className="h-px w-4 border-t border-dashed border-emerald-500/70" />Net average</span>
+                    </div>
+                </>
+            )}
+        </ChartShell>
     );
 }
