@@ -28,7 +28,7 @@ const chartTooltipStyle = {
     color: "hsl(var(--popover-foreground))",
 };
 
-const currency = new Intl.NumberFormat("es-ES", {
+const currency = new Intl.NumberFormat("en-GB", {
     style: "currency",
     currency: "EUR",
     maximumFractionDigits: 0,
@@ -50,10 +50,10 @@ export function AssetAllocationChart({ categories }: { categories: CategoryBreak
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Asignación patrimonial</CardTitle>
+                <CardTitle>Asset allocation</CardTitle>
             </CardHeader>
             <CardContent>
-                {chartData.length === 0 ? <EmptyChart message="Sin datos de patrimonio" /> : (
+                {chartData.length === 0 ? <EmptyChart message="No net worth data" /> : (
                     <ResponsiveContainer width="100%" height={280}>
                         <PieChart>
                             <Pie
@@ -98,17 +98,17 @@ export function PortfolioExposureChart({ holdings }: { holdings: Holding[] }) {
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Exposición por posición</CardTitle>
+                <CardTitle>Exposure by position</CardTitle>
             </CardHeader>
             <CardContent>
-                {chartData.length === 0 ? <EmptyChart message="Sin posiciones abiertas" /> : (
+                {chartData.length === 0 ? <EmptyChart message="No open positions" /> : (
                     <ResponsiveContainer width="100%" height={280}>
                         <BarChart data={chartData} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
                             <CartesianGrid stroke={chartGridColor} strokeDasharray="3 3" vertical={false} />
                             <XAxis dataKey="symbol" tick={{ fill: chartTextColor, fontSize: 11 }} axisLine={false} tickLine={false} />
                             <YAxis tick={{ fill: chartTextColor, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(value) => `${Math.round(value / 1000)}k`} />
                             <Tooltip formatter={(value) => formatCurrency(Number(value))} contentStyle={chartTooltipStyle} />
-                            <Bar dataKey="cost" name="Coste" fill="#2563eb" radius={[6, 6, 0, 0]} />
+                            <Bar dataKey="cost" name="Cost" fill="#2563eb" radius={[6, 6, 0, 0]} />
                         </BarChart>
                     </ResponsiveContainer>
                 )}
@@ -126,7 +126,7 @@ export function SalaryTrendChart({ salaries }: { salaries: SalaryRecord[] }) {
         if (Number.isNaN(date.getTime()) || date.getFullYear() !== currentYear) continue;
         const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
         const current = monthly.get(key) ?? {
-            month: date.toLocaleDateString("es-ES", { month: "short" }),
+            month: date.toLocaleDateString("en-GB", { month: "short" }),
             gross: 0,
             net: 0,
         };
@@ -142,10 +142,10 @@ export function SalaryTrendChart({ salaries }: { salaries: SalaryRecord[] }) {
     return (
         <Card className="lg:col-span-2">
             <CardHeader>
-                <CardTitle>Evolución salarial mensual</CardTitle>
+                <CardTitle>Monthly salary trend</CardTitle>
             </CardHeader>
             <CardContent>
-                {chartData.length === 0 ? <EmptyChart message="Sin nóminas del año actual" /> : (
+                {chartData.length === 0 ? <EmptyChart message="No salaries for the current year" /> : (
                     <ResponsiveContainer width="100%" height={300}>
                         <AreaChart data={chartData} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
                             <defs>
@@ -163,8 +163,8 @@ export function SalaryTrendChart({ salaries }: { salaries: SalaryRecord[] }) {
                             <YAxis tick={{ fill: chartTextColor, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(value) => `${Math.round(value / 1000)}k`} />
                             <Tooltip formatter={(value) => formatCurrency(Number(value))} contentStyle={chartTooltipStyle} />
                             <Legend />
-                            <Area type="monotone" dataKey="gross" name="Bruto" stroke="#7c3aed" fill="url(#grossSalary)" strokeWidth={2} />
-                            <Area type="monotone" dataKey="net" name="Neto" stroke="#059669" fill="url(#netSalary)" strokeWidth={2} />
+                            <Area type="monotone" dataKey="gross" name="Gross" stroke="#7c3aed" fill="url(#grossSalary)" strokeWidth={2} />
+                            <Area type="monotone" dataKey="net" name="Net" stroke="#059669" fill="url(#netSalary)" strokeWidth={2} />
                         </AreaChart>
                     </ResponsiveContainer>
                 )}

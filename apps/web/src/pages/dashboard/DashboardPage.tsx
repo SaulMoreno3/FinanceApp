@@ -15,7 +15,7 @@ type DashboardData = {
   imports: { myinvestor: string | null; revolut: string | null };
 };
 
-const formatCurrency = (value: number, currency = "EUR") => new Intl.NumberFormat("es-ES", {
+const formatCurrency = (value: number, currency = "EUR") => new Intl.NumberFormat("en-GB", {
   style: "currency",
   currency,
   maximumFractionDigits: 2,
@@ -39,7 +39,7 @@ export default function DashboardPage() {
       setError(null);
     } catch (loadError) {
       console.error(loadError);
-      setError("No se ha podido cargar el resumen financiero.");
+      setError("Unable to load the financial summary.");
     } finally {
       setLoading(false);
     }
@@ -59,11 +59,11 @@ export default function DashboardPage() {
     <div className="h-full overflow-auto p-4 md:p-8">
       <div className="mb-6 flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Resumen</h1>
-          <p className="text-sm text-muted-foreground">Datos consolidados de tu cuenta.</p>
+          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-sm text-muted-foreground">A consolidated view of your account.</p>
         </div>
         <Button variant="outline" onClick={loadDashboard} disabled={loading}>
-          <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Actualizar
+          <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} /> Refresh
         </Button>
       </div>
 
@@ -74,10 +74,10 @@ export default function DashboardPage() {
           <Card key={index}><CardHeader><Skeleton className="h-4 w-28" /></CardHeader><CardContent><Skeleton className="h-8 w-36" /></CardContent></Card>
         )) : data && (
           <>
-            <Card><CardHeader className="flex-row items-center justify-between"><CardTitle className="text-sm">Patrimonio en EUR</CardTitle><Wallet className="h-4 w-4" /></CardHeader><CardContent><div className="text-2xl font-bold">{formatCurrency(data.netWorth.totalCurrentNetWorth)}</div><p className="text-xs text-muted-foreground">{data.netWorth.countActive} activos activos</p></CardContent></Card>
-            <Card><CardHeader className="flex-row items-center justify-between"><CardTitle className="text-sm">Capital invertido</CardTitle><PieChart className="h-4 w-4" /></CardHeader><CardContent><div className="text-2xl font-bold">{data.portfolio.totalCostBasis === null ? "No disponible" : formatCurrency(data.portfolio.totalCostBasis)}</div><p className="text-xs text-muted-foreground">{data.portfolio.holdings.filter(item => item.remainingShares > 0).length} posiciones</p></CardContent></Card>
-            <Card><CardHeader className="flex-row items-center justify-between"><CardTitle className="text-sm">Nómina neta registrada</CardTitle><Banknote className="h-4 w-4" /></CardHeader><CardContent><div className="text-2xl font-bold">{formatCurrency(salaryTotal)}</div><p className="text-xs text-muted-foreground">{data.salaries.meta.total} registros</p></CardContent></Card>
-            <Card><CardHeader className="flex-row items-center justify-between"><CardTitle className="text-sm">Última importación</CardTitle><Upload className="h-4 w-4" /></CardHeader><CardContent><div className="text-lg font-bold">{latestImport ? new Date(latestImport).toLocaleDateString("es-ES") : "Nunca"}</div><p className="text-xs text-muted-foreground">MyInvestor y Revolut</p></CardContent></Card>
+            <Card><CardHeader className="flex-row items-center justify-between"><CardTitle className="text-sm">Net worth in EUR</CardTitle><Wallet className="h-4 w-4" /></CardHeader><CardContent><div className="text-2xl font-bold">{formatCurrency(data.netWorth.totalCurrentNetWorth)}</div><p className="text-xs text-muted-foreground">{data.netWorth.countActive} active assets</p></CardContent></Card>
+            <Card><CardHeader className="flex-row items-center justify-between"><CardTitle className="text-sm">Invested capital</CardTitle><PieChart className="h-4 w-4" /></CardHeader><CardContent><div className="text-2xl font-bold">{data.portfolio.totalCostBasis === null ? "Not available" : formatCurrency(data.portfolio.totalCostBasis)}</div><p className="text-xs text-muted-foreground">{data.portfolio.holdings.filter(item => item.remainingShares > 0).length} open positions</p></CardContent></Card>
+            <Card><CardHeader className="flex-row items-center justify-between"><CardTitle className="text-sm">Recorded net salary</CardTitle><Banknote className="h-4 w-4" /></CardHeader><CardContent><div className="text-2xl font-bold">{formatCurrency(salaryTotal)}</div><p className="text-xs text-muted-foreground">{data.salaries.meta.total} records</p></CardContent></Card>
+            <Card><CardHeader className="flex-row items-center justify-between"><CardTitle className="text-sm">Latest import</CardTitle><Upload className="h-4 w-4" /></CardHeader><CardContent><div className="text-lg font-bold">{latestImport ? new Date(latestImport).toLocaleDateString("en-GB") : "Never"}</div><p className="text-xs text-muted-foreground">MyInvestor and Revolut</p></CardContent></Card>
           </>
         )}
       </div>

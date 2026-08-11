@@ -12,7 +12,7 @@ function getErrorMessage(error: unknown) {
         return error.message;
     }
 
-    return "Ha ocurrido un error inesperado.";
+    return "An unexpected error occurred.";
 }
 
 export default function RouteErrorBoundary() {
@@ -27,20 +27,20 @@ export default function RouteErrorBoundary() {
                         <AlertTriangle className="h-6 w-6" />
                     </div>
                     <div className="space-y-2">
-                        <h1 className="text-2xl font-semibold tracking-tight">Algo no ha cargado bien</h1>
+                        <h1 className="text-2xl font-semibold tracking-tight">Something went wrong</h1>
                         <p className="text-sm text-muted-foreground">
-                            Prueba a recargar la página. Si sigue pasando, vuelve al inicio y continúa desde ahí.
+                            Try reloading the page. If the problem persists, return home and continue from there.
                         </p>
                         <p className="rounded-md bg-muted px-3 py-2 text-xs text-muted-foreground">{message}</p>
                     </div>
                     <div className="flex flex-col gap-2 sm:flex-row">
                         <Button type="button" onClick={() => window.location.reload()}>
                             <RefreshCw className="mr-2 h-4 w-4" />
-                            Recargar
+                            Reload
                         </Button>
                         <Button type="button" variant="outline" onClick={() => window.location.assign("/")}>
                             <Home className="mr-2 h-4 w-4" />
-                            Ir al inicio
+                            Go home
                         </Button>
                     </div>
                 </CardContent>

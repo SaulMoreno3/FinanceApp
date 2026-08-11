@@ -177,8 +177,8 @@ export default function SalaryForm({ onSuccess, onCancel, initialData }: SalaryF
 Extract the following information from the attached payroll/invoice text or image:
 1. Date (YYYY-MM-DD)
 2. Company Name
-3. Gross Salary (Total Devengado) - Number
-4. Net Salary (Líquido a Percibir) - Number
+3. Gross Salary (Gross earnings) - Number
+4. Net Salary (Net pay) - Number
 5. Breakdown items (Include BOTH payments and deductions/taxes).
 
 Output ONLY valid JSON in this exact format:

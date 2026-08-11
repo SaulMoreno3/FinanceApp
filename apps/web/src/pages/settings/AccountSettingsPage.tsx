@@ -188,7 +188,7 @@ export default function AccountSettingsPage() {
                             <Select value={profile.locale} onValueChange={(value: "es-ES" | "en-US" | "en-GB") => setProfile((current) => ({ ...current, locale: value }))}>
                                 <SelectTrigger><SelectValue /></SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="es-ES">Español (España)</SelectItem>
+                                    <SelectItem value="es-ES">Spanish (Spain)</SelectItem>
                                     <SelectItem value="en-US">English (US)</SelectItem>
                                     <SelectItem value="en-GB">English (UK)</SelectItem>
                                 </SelectContent>
@@ -207,7 +207,7 @@ export default function AccountSettingsPage() {
                                 <SelectTrigger><SelectValue /></SelectTrigger>
                                 <SelectContent>
                                     <SelectItem value="EUR">EUR — Euro</SelectItem>
-                                    <SelectItem value="USD">USD — Dólar</SelectItem>
+                                    <SelectItem value="USD">USD — Dollar</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>

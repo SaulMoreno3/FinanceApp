@@ -77,12 +77,12 @@ const emptyTransactions: TransactionsResponse = {
     data: [],
 };
 
-const numberFormatter = new Intl.NumberFormat("es-ES", {
+const numberFormatter = new Intl.NumberFormat("en-GB", {
     maximumFractionDigits: 2,
 });
 
 function formatCurrency(value: number | null | undefined, currency = "EUR") {
-    return new Intl.NumberFormat("es-ES", {
+    return new Intl.NumberFormat("en-GB", {
         style: "currency",
         currency,
         maximumFractionDigits: 2,
@@ -92,7 +92,7 @@ function formatCurrency(value: number | null | undefined, currency = "EUR") {
 function formatDate(value: string) {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return "—";
-    return new Intl.DateTimeFormat("es-ES", {
+    return new Intl.DateTimeFormat("en-GB", {
         day: "2-digit",
         month: "short",
         year: "numeric",
@@ -254,10 +254,10 @@ export default function ReportsPage() {
             <div className="flex min-h-[420px] flex-col items-center justify-center gap-4 p-8 text-center">
                 <Activity className="h-10 w-10 text-muted-foreground" />
                 <div>
-                    <h2 className="text-lg font-semibold">Reports no disponible</h2>
-                    <p className="mt-1 text-sm text-muted-foreground">{error ?? "No hay datos suficientes todavía."}</p>
+                <h2 className="text-lg font-semibold">Reports unavailable</h2>
+                    <p className="mt-1 text-sm text-muted-foreground">{error ?? "There is not enough data yet."}</p>
                 </div>
-                <Button variant="outline" onClick={loadReports}>Reintentar</Button>
+                <Button variant="outline" onClick={loadReports}>Retry</Button>
             </div>
         );
     }
@@ -268,47 +268,47 @@ export default function ReportsPage() {
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Reports</h1>
                     <p className="mt-1 text-sm text-muted-foreground">
-                        Una visión consolidada de tu patrimonio, inversiones e ingresos.
+                        A consolidated view of your net worth, investments and income.
                     </p>
                 </div>
                 <Button variant="outline" onClick={loadReports} disabled={isLoading}>
                     <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
-                    Actualizar
+                    Refresh
                 </Button>
             </div>
 
             {Object.keys(sectionErrors).length > 0 && (
                 <Card className="border-amber-200 bg-amber-50 text-amber-950">
                     <CardContent className="p-4 text-sm">
-                        Algunos bloques no han podido actualizarse ahora mismo. El resto del informe sigue disponible.
+                        Some sections could not be refreshed right now. The rest of the report is still available.
                     </CardContent>
                 </Card>
             )}
 
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <MetricCard
-                    title="Patrimonio neto"
+                    title="Net worth"
                     value={formatCurrency(data.netWorth.totalCurrentNetWorth)}
                     description={`${data.netWorth.countActive} activos en cartera`}
                     icon={Wallet}
                 />
                 <MetricCard
                     title="Capital invertido"
-                    value={data.portfolio.totalCostBasis === null ? "No disponible" : formatCurrency(data.portfolio.totalCostBasis)}
+                    value={data.portfolio.totalCostBasis === null ? "Not available" : formatCurrency(data.portfolio.totalCostBasis)}
                     description={`${holdings.length} posiciones abiertas`}
                     icon={PieChart}
                 />
                 <MetricCard
-                    title="Beneficio realizado"
-                    value={data.portfolio.totalRealizedGain === null ? "No disponible" : formatCurrency(data.portfolio.totalRealizedGain)}
-                    description="Acumulado de operaciones cerradas"
+                    title="Realized profit"
+                    value={data.portfolio.totalRealizedGain === null ? "Not available" : formatCurrency(data.portfolio.totalRealizedGain)}
+                    description="Accumulated from closed trades"
                     icon={TrendingUp}
                     valueClassName={(data.portfolio.totalRealizedGain ?? 0) >= 0 ? "text-emerald-600" : "text-red-600"}
                 />
                 <MetricCard
                     title="Annual Gross Salary"
                     value={formatCurrency(salaryMetrics.gross)}
-                    description={`${salaryMetrics.count} nóminas en ${new Date().getFullYear()}`}
+                    description={`${salaryMetrics.count} salaries in ${new Date().getFullYear()}`}
                     icon={Banknote}
                 />
             </div>
@@ -325,11 +325,11 @@ export default function ReportsPage() {
             <div className="grid gap-6 lg:grid-cols-2">
                 <Card>
                     <CardHeader>
-                        <CardTitle>Distribución del patrimonio</CardTitle>
+                        <CardTitle>Net worth distribution</CardTitle>
                     </CardHeader>
                     <CardContent>
                         {data.netWorth.breakdownByCategory.length === 0 ? (
-                            <p className="py-10 text-center text-sm text-muted-foreground">Todavía no hay activos categorizados.</p>
+                            <p className="py-10 text-center text-sm text-muted-foreground">There are no categorized assets yet.</p>
                         ) : (
                             <div className="space-y-5">
                                 {data.netWorth.breakdownByCategory
@@ -347,7 +347,7 @@ export default function ReportsPage() {
                                                 <div className="h-2 overflow-hidden rounded-full bg-muted">
                                                     <div className="h-full rounded-full bg-primary" style={{ width: `${percentage}%` }} />
                                                 </div>
-                                                <p className="text-xs text-muted-foreground">{percentage.toFixed(1)}% · {item.count} activo{item.count === 1 ? "" : "s"}</p>
+                                                <p className="text-xs text-muted-foreground">{percentage.toFixed(1)}% · {item.count} asset{item.count === 1 ? "" : "s"}</p>
                                             </div>
                                         );
                                     })}
@@ -358,19 +358,19 @@ export default function ReportsPage() {
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>Exposición de cartera</CardTitle>
+                        <CardTitle>Portfolio exposure</CardTitle>
                     </CardHeader>
                     <CardContent className="overflow-x-auto">
                         {holdings.length === 0 ? (
-                            <p className="py-10 text-center text-sm text-muted-foreground">Todavía no hay posiciones abiertas.</p>
+                            <p className="py-10 text-center text-sm text-muted-foreground">There are no open positions yet.</p>
                         ) : (
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead>Activo</TableHead>
-                                        <TableHead className="text-right">Unidades</TableHead>
-                                        <TableHead className="text-right">Coste</TableHead>
-                                        <TableHead className="text-right">Peso</TableHead>
+                                        <TableHead>Asset</TableHead>
+                                        <TableHead className="text-right">Units</TableHead>
+                                        <TableHead className="text-right">Cost</TableHead>
+                                        <TableHead className="text-right">Weight</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
@@ -405,26 +405,26 @@ export default function ReportsPage() {
             <div className="grid gap-6 lg:grid-cols-[1fr_1.4fr]">
                 <Card>
                     <CardHeader>
-                        <CardTitle>Resumen de ingresos</CardTitle>
+                        <CardTitle>Income summary</CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
                         <div className="flex items-center justify-between border-b pb-3 text-sm">
-                            <span className="text-muted-foreground">Bruto anual</span>
+                            <span className="text-muted-foreground">Annual gross</span>
                             <span className="font-semibold">{formatCurrency(salaryMetrics.gross)}</span>
                         </div>
                         <div className="flex items-center justify-between border-b pb-3 text-sm">
-                            <span className="text-muted-foreground">Neto anual</span>
+                            <span className="text-muted-foreground">Annual net</span>
                             <span className="font-semibold">{formatCurrency(salaryMetrics.net)}</span>
                         </div>
                         <div className="flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground">Última nómina</span>
+                            <span className="text-muted-foreground">Latest salary</span>
                             <span className="font-semibold">
                                 {salaryMetrics.latest ? formatCurrency(Number(salaryMetrics.latest.netSalary ?? 0)) : "—"}
                             </span>
                         </div>
                         {salaryMetrics.latest && (
                             <p className="text-xs text-muted-foreground">
-                                {salaryMetrics.latest.company || "Sin empresa"} · {formatDate(salaryMetrics.latest.date)}
+                                {salaryMetrics.latest.company || "Unknown company"} · {formatDate(salaryMetrics.latest.date)}
                             </p>
                         )}
                     </CardContent>
@@ -432,19 +432,19 @@ export default function ReportsPage() {
 
                 <Card>
                     <CardHeader>
-                        <CardTitle>Actividad reciente</CardTitle>
+                        <CardTitle>Recent activity</CardTitle>
                     </CardHeader>
                     <CardContent className="overflow-x-auto">
                         {data.transactions.data.length === 0 ? (
-                            <p className="py-10 text-center text-sm text-muted-foreground">No hay transacciones recientes.</p>
+                            <p className="py-10 text-center text-sm text-muted-foreground">No recent transactions.</p>
                         ) : (
                             <Table>
                                 <TableHeader>
                                     <TableRow>
-                                        <TableHead>Fecha</TableHead>
-                                        <TableHead>Concepto</TableHead>
-                                        <TableHead>Tipo</TableHead>
-                                        <TableHead className="text-right">Importe</TableHead>
+                                        <TableHead>Date</TableHead>
+                                        <TableHead>Description</TableHead>
+                                        <TableHead>Type</TableHead>
+                                        <TableHead className="text-right">Amount</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>

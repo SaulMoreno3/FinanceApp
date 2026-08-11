@@ -117,7 +117,7 @@ export default function ImportPage() {
                         </div>
 
                         <div className="space-y-2">
-                            <h4 className="text-sm font-medium">Órdenes (Optional)</h4>
+                            <h4 className="text-sm font-medium">Orders (Optional)</h4>
                             <div className="filepond-wrapper dark-mode">
                                 <FilePond
                                     files={myInvestorOrders}
@@ -125,7 +125,7 @@ export default function ImportPage() {
                                     allowMultiple={false}
                                     maxFiles={1}
                                     name="orders"
-                                    labelIdle='Drag & Drop "Órdenes" CSV'
+                                    labelIdle='Drag & Drop "Orders" CSV'
                                 />
                             </div>
                         </div>

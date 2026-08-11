@@ -65,7 +65,7 @@ export default function SalaryDetailModal({ salaryId, onClose }: SalaryDetailMod
         loadingTask.onPassword = (_callback: (password: string) => void, _reason: number) => {
             void _callback;
             void _reason;
-            if (!cancelled) setPdfError("Este documento está protegido con contraseña y no se puede mostrar aquí.");
+            if (!cancelled) setPdfError("This document is password-protected and cannot be displayed here.");
         };
 
         loadingTask.promise
@@ -146,7 +146,7 @@ export default function SalaryDetailModal({ salaryId, onClose }: SalaryDetailMod
             setPdfSalaryId(data.id);
         } catch (error) {
             console.error(error);
-            setPdfError("No se ha podido cargar el documento.");
+            setPdfError("Unable to load the document.");
         } finally {
             setIsPdfLoading(false);
         }
@@ -168,7 +168,7 @@ export default function SalaryDetailModal({ salaryId, onClose }: SalaryDetailMod
             <div className="space-y-4">
                 {payments.length > 0 && (
                     <div>
-                        <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">Earnings (Devengos)</h4>
+                        <h4 className="text-xs font-semibold text-muted-foreground uppercase mb-2">Earnings</h4>
                         <div className="space-y-2">
                             {payments.map((item, i) => (
                                 <div key={i} className="flex justify-between gap-4 text-sm">
@@ -302,7 +302,7 @@ export default function SalaryDetailModal({ salaryId, onClose }: SalaryDetailMod
                         <Button variant="outline" className="w-full gap-2 h-12" onClick={openPdf}>
                             <FileText className="w-4 h-4 text-primary" />
                             <div className="flex flex-col items-start flex-1 text-left">
-                                <span className="text-sm font-medium leading-none">Ver documento</span>
+                                <span className="text-sm font-medium leading-none">View document</span>
                                 <span className="text-[10px] text-muted-foreground">{fixEncoding(data.fileName)}</span>
                             </div>
                             <Eye className="w-4 h-4 text-muted-foreground" />
