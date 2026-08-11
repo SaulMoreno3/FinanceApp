@@ -22,6 +22,8 @@ export class TaxesService {
                     taxYear: data.taxYear,
                     country: data.country,
                     status: data.status,
+                    totalIncome: data.totalIncome,
+                    taxPaid: data.taxPaid,
                     filingDate: data.filingDate ? new Date(`${data.filingDate}T00:00:00.000Z`) : undefined,
                     notes: data.notes || undefined,
                     fileName: file?.originalname,
