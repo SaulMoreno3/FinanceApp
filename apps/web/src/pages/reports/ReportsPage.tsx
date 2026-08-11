@@ -1,8 +1,20 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Activity, Banknote, PieChart, RefreshCw, TrendingUp, Wallet } from "lucide-react";
+import {
+    Activity,
+    ArrowDownRight,
+    ArrowUpRight,
+    Banknote,
+    BriefcaseBusiness,
+    CircleDollarSign,
+    RefreshCw,
+    Sparkles,
+    TrendingUp,
+    Wallet,
+} from "lucide-react";
 import { fetchAPI } from "@/lib/api";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
     Table,
@@ -45,6 +57,7 @@ interface ReportData {
 }
 
 type ReportSection = keyof ReportData;
+type MetricTone = "violet" | "blue" | "emerald" | "amber";
 
 const emptyNetWorth: NetWorthSummary = {
     totalCurrentNetWorth: 0,
@@ -65,21 +78,12 @@ const emptyPortfolio: PortfolioSummary = {
 
 const emptySalaries: SalaryListResponse = {
     data: [],
-    meta: {
-        total: 0,
-        page: 1,
-        limit: 100,
-        totalPages: 0,
-    },
+    meta: { total: 0, page: 1, limit: 100, totalPages: 0 },
 };
 
-const emptyTransactions: TransactionsResponse = {
-    data: [],
-};
+const emptyTransactions: TransactionsResponse = { data: [] };
 
-const numberFormatter = new Intl.NumberFormat("en-GB", {
-    maximumFractionDigits: 2,
-});
+const numberFormatter = new Intl.NumberFormat("en-GB", { maximumFractionDigits: 2 });
 
 function formatCurrency(value: number | null | undefined, currency = "EUR") {
     return new Intl.NumberFormat("en-GB", {
@@ -104,28 +108,64 @@ function displayTransactionType(type: string, side?: string) {
     return side || type;
 }
 
+function transactionIsPositive(transaction: Transaction) {
+    return transaction.side === "Sell" || transaction.type === "Dividend" || transaction.type === "Income";
+}
+
+const metricStyles: Record<MetricTone, { glow: string; icon: string; accent: string }> = {
+    violet: {
+        glow: "from-violet-500/20 via-violet-500/[0.04] to-transparent",
+        icon: "border-violet-500/20 bg-violet-500/10 text-violet-400",
+        accent: "bg-violet-500",
+    },
+    blue: {
+        glow: "from-blue-500/20 via-blue-500/[0.04] to-transparent",
+        icon: "border-blue-500/20 bg-blue-500/10 text-blue-400",
+        accent: "bg-blue-500",
+    },
+    emerald: {
+        glow: "from-emerald-500/20 via-emerald-500/[0.04] to-transparent",
+        icon: "border-emerald-500/20 bg-emerald-500/10 text-emerald-400",
+        accent: "bg-emerald-500",
+    },
+    amber: {
+        glow: "from-amber-500/20 via-amber-500/[0.04] to-transparent",
+        icon: "border-amber-500/20 bg-amber-500/10 text-amber-400",
+        accent: "bg-amber-500",
+    },
+};
+
 function MetricCard({
     title,
     value,
     description,
     icon: Icon,
+    tone,
     valueClassName = "",
 }: {
     title: string;
     value: string;
     description: string;
     icon: typeof Wallet;
+    tone: MetricTone;
     valueClassName?: string;
 }) {
+    const styles = metricStyles[tone];
     return (
-        <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">{title}</CardTitle>
-                <Icon className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-                <div className={`text-2xl font-bold ${valueClassName}`}>{value}</div>
-                <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+        <Card className="group relative overflow-hidden border-border/70 bg-card/80 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-border hover:shadow-xl hover:shadow-black/10">
+            <div className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${styles.glow} opacity-70 transition-opacity group-hover:opacity-100`} />
+            <div className={`absolute inset-x-0 top-0 h-0.5 ${styles.accent}`} />
+            <CardContent className="relative p-5">
+                <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0">
+                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{title}</p>
+                        <p className={`mt-3 truncate text-2xl font-bold tracking-tight xl:text-[1.7rem] ${valueClassName}`}>{value}</p>
+                        <p className="mt-2 text-xs text-muted-foreground">{description}</p>
+                    </div>
+                    <div className={`shrink-0 rounded-xl border p-2.5 ${styles.icon}`}>
+                        <Icon className="h-4 w-4" />
+                    </div>
+                </div>
             </CardContent>
         </Card>
     );
@@ -134,26 +174,12 @@ function MetricCard({
 function LoadingState() {
     return (
         <div className="space-y-6">
+            <Skeleton className="h-52 w-full rounded-3xl" />
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                {[1, 2, 3, 4].map((item) => (
-                    <Card key={item}>
-                        <CardContent className="space-y-3 pt-6">
-                            <Skeleton className="h-4 w-28" />
-                            <Skeleton className="h-8 w-36" />
-                            <Skeleton className="h-3 w-24" />
-                        </CardContent>
-                    </Card>
-                ))}
+                {[1, 2, 3, 4].map((item) => <Skeleton key={item} className="h-36 rounded-xl" />)}
             </div>
             <div className="grid gap-6 lg:grid-cols-2">
-                {[1, 2].map((item) => (
-                    <Card key={item}>
-                        <CardContent className="space-y-4 pt-6">
-                            <Skeleton className="h-5 w-40" />
-                            <Skeleton className="h-40 w-full" />
-                        </CardContent>
-                    </Card>
-                ))}
+                {[1, 2].map((item) => <Skeleton key={item} className="h-[390px] rounded-xl" />)}
             </div>
         </div>
     );
@@ -180,26 +206,22 @@ export default function ReportsPage() {
                     return [section, { status: "fulfilled", value: await request }] as const;
                 } catch (loadError) {
                     console.error(`Failed to load reports section: ${section}`, loadError);
-                    return [
-                        section,
-                        {
-                            status: "rejected",
-                            reason: loadError instanceof Error ? loadError.message : "Error desconocido",
-                        },
-                    ] as const;
+                    return [section, {
+                        status: "rejected",
+                        reason: loadError instanceof Error ? loadError.message : "Unknown error",
+                    }] as const;
                 }
-            })
+            }),
         );
 
-        const results = Object.fromEntries(entries) as Record<
-            ReportSection,
+        const results = Object.fromEntries(entries) as Record<ReportSection,
             | { status: "fulfilled"; value: unknown }
             | { status: "rejected"; reason: string }
         >;
         const nextSectionErrors = Object.fromEntries(
             Object.entries(results)
                 .filter(([, result]) => result.status === "rejected")
-                .map(([section, result]) => [section, result.status === "rejected" ? result.reason : ""])
+                .map(([section, result]) => [section, result.status === "rejected" ? result.reason : ""]),
         ) as Partial<Record<ReportSection, string>>;
 
         setData({
@@ -209,7 +231,7 @@ export default function ReportsPage() {
             transactions: results.transactions.status === "fulfilled" ? results.transactions.value as TransactionsResponse : emptyTransactions,
         });
         setSectionErrors(nextSectionErrors);
-        setError(Object.keys(nextSectionErrors).length === 4 ? "No se han podido cargar los informes." : null);
+        setError(Object.keys(nextSectionErrors).length === 4 ? "Reports could not be loaded." : null);
         setIsLoading(false);
     }, []);
 
@@ -223,20 +245,16 @@ export default function ReportsPage() {
         const currentYearSalaries = data?.salaries.data.filter((salary) => {
             return salary.date && new Date(salary.date).getFullYear() === currentYear;
         }) ?? [];
+        const gross = currentYearSalaries.reduce((total, salary) => total + Number(salary.grossSalary ?? 0), 0);
+        const net = currentYearSalaries.reduce((total, salary) => total + Number(salary.netSalary ?? 0), 0);
 
         return {
-            gross: currentYearSalaries.reduce((total, salary) => total + Number(salary.grossSalary ?? 0), 0),
-            net: currentYearSalaries.reduce((total, salary) => total + Number(salary.netSalary ?? 0), 0),
+            gross,
+            net,
+            takeHomeRate: gross > 0 ? (net / gross) * 100 : 0,
             count: currentYearSalaries.length,
             latest: data?.salaries.data[0] ?? null,
         };
-    }, [data]);
-
-    const categoryTotals = useMemo(() => {
-        return data?.netWorth.breakdownByCategory.reduce<Record<string, number>>((totals, item) => {
-            totals[item.currency] = (totals[item.currency] ?? 0) + item.totalValue;
-            return totals;
-        }, {}) ?? {};
     }, [data]);
 
     const holdings = useMemo(() => {
@@ -246,15 +264,15 @@ export default function ReportsPage() {
     }, [data]);
 
     if (isLoading && !data) {
-        return <div className="space-y-6 p-6 md:p-8"><LoadingState /></div>;
+        return <div className="p-5 md:p-8"><LoadingState /></div>;
     }
 
     if (error || !data) {
         return (
-            <div className="flex min-h-[420px] flex-col items-center justify-center gap-4 p-8 text-center">
-                <Activity className="h-10 w-10 text-muted-foreground" />
+            <div className="flex min-h-[520px] flex-col items-center justify-center gap-4 p-8 text-center">
+                <div className="rounded-2xl border border-destructive/20 bg-destructive/10 p-4"><Activity className="h-7 w-7 text-destructive" /></div>
                 <div>
-                <h2 className="text-lg font-semibold">Reports unavailable</h2>
+                    <h2 className="text-lg font-semibold">Reports unavailable</h2>
                     <p className="mt-1 text-sm text-muted-foreground">{error ?? "There is not enough data yet."}</p>
                 </div>
                 <Button variant="outline" onClick={loadReports}>Retry</Button>
@@ -263,215 +281,246 @@ export default function ReportsPage() {
     }
 
     return (
-        <div className="space-y-6 p-6 md:p-8">
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Reports</h1>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                        A consolidated view of your net worth, investments and income.
-                    </p>
-                </div>
-                <Button variant="outline" onClick={loadReports} disabled={isLoading}>
-                    <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
-                    Refresh
-                </Button>
-            </div>
+        <div className="relative min-h-full overflow-hidden">
+            <div className="pointer-events-none absolute -right-40 -top-36 h-96 w-96 rounded-full bg-violet-500/[0.07] blur-3xl" />
+            <div className="pointer-events-none absolute -left-32 top-[36rem] h-80 w-80 rounded-full bg-blue-500/[0.05] blur-3xl" />
 
-            {Object.keys(sectionErrors).length > 0 && (
-                <Card className="border-amber-200 bg-amber-50 text-amber-950">
-                    <CardContent className="p-4 text-sm">
-                        Some sections could not be refreshed right now. The rest of the report is still available.
-                    </CardContent>
-                </Card>
-            )}
+            <div className="relative space-y-6 p-5 md:p-8">
+                <section className="relative overflow-hidden rounded-3xl border border-border/70 bg-gradient-to-br from-card via-card to-primary/[0.09] px-6 py-7 shadow-xl shadow-black/[0.04] md:px-8 md:py-9">
+                    <div className="pointer-events-none absolute -right-16 -top-28 h-72 w-72 rounded-full border border-primary/10 bg-primary/[0.06]" />
+                    <div className="pointer-events-none absolute -right-2 top-8 h-40 w-40 rounded-full border border-primary/10" />
+                    <div className="relative flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
+                        <div className="max-w-2xl">
+                            <Badge variant="outline" className="mb-4 gap-1.5 border-primary/20 bg-primary/10 px-3 py-1 text-primary">
+                                <Sparkles className="h-3.5 w-3.5" /> Financial overview
+                            </Badge>
+                            <h1 className="text-3xl font-bold tracking-[-0.03em] md:text-4xl">Your financial command centre</h1>
+                            <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground md:text-base">
+                                A clear view of your wealth, portfolio exposure and income performance — all in one place.
+                            </p>
+                        </div>
+                        <div className="flex flex-col items-start gap-2 sm:items-end">
+                            <Button variant="outline" className="border-border/80 bg-background/60 shadow-sm backdrop-blur" onClick={loadReports} disabled={isLoading}>
+                                <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+                                Refresh data
+                            </Button>
+                            <span className="text-[11px] text-muted-foreground">Live data · FIFO portfolio method</span>
+                        </div>
+                    </div>
+                </section>
 
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-                <MetricCard
-                    title="Net worth"
-                    value={formatCurrency(data.netWorth.totalCurrentNetWorth)}
-                    description={`${data.netWorth.countActive} activos en cartera`}
-                    icon={Wallet}
-                />
-                <MetricCard
-                    title="Capital invertido"
-                    value={data.portfolio.totalCostBasis === null ? "Not available" : formatCurrency(data.portfolio.totalCostBasis)}
-                    description={`${holdings.length} posiciones abiertas`}
-                    icon={PieChart}
-                />
-                <MetricCard
-                    title="Realized profit"
-                    value={data.portfolio.totalRealizedGain === null ? "Not available" : formatCurrency(data.portfolio.totalRealizedGain)}
-                    description="Accumulated from closed trades"
-                    icon={TrendingUp}
-                    valueClassName={(data.portfolio.totalRealizedGain ?? 0) >= 0 ? "text-emerald-600" : "text-red-600"}
-                />
-                <MetricCard
-                    title="Annual Gross Salary"
-                    value={formatCurrency(salaryMetrics.gross)}
-                    description={`${salaryMetrics.count} salaries in ${new Date().getFullYear()}`}
-                    icon={Banknote}
-                />
-            </div>
+                {Object.keys(sectionErrors).length > 0 && (
+                    <div className="flex items-center gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
+                        <Activity className="h-4 w-4 shrink-0" />
+                        Some sections could not be refreshed. Available data is still shown below.
+                    </div>
+                )}
 
-            <div className="grid gap-6 lg:grid-cols-2">
-                <AssetAllocationChart categories={data.netWorth.breakdownByCategory} />
-                <PortfolioExposureChart holdings={data.portfolio.holdings} />
-            </div>
+                <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+                    <MetricCard
+                        title="Net worth"
+                        value={formatCurrency(data.netWorth.totalCurrentNetWorth)}
+                        description={`${data.netWorth.countActive} active assets`}
+                        icon={Wallet}
+                        tone="violet"
+                    />
+                    <MetricCard
+                        title="Invested capital"
+                        value={data.portfolio.totalCostBasis === null ? "Not available" : formatCurrency(data.portfolio.totalCostBasis)}
+                        description={`${holdings.length} open positions`}
+                        icon={BriefcaseBusiness}
+                        tone="blue"
+                    />
+                    <MetricCard
+                        title="Realized profit"
+                        value={data.portfolio.totalRealizedGain === null ? "Not available" : formatCurrency(data.portfolio.totalRealizedGain)}
+                        description="Accumulated from closed trades"
+                        icon={TrendingUp}
+                        tone="emerald"
+                        valueClassName={(data.portfolio.totalRealizedGain ?? 0) >= 0 ? "text-emerald-500" : "text-rose-500"}
+                    />
+                    <MetricCard
+                        title="Gross income YTD"
+                        value={formatCurrency(salaryMetrics.gross)}
+                        description={`${salaryMetrics.count} income records in ${new Date().getFullYear()}`}
+                        icon={Banknote}
+                        tone="amber"
+                    />
+                </section>
 
-            <div className="grid gap-6 lg:grid-cols-2">
-                <SalaryTrendChart salaries={data.salaries.data} />
-            </div>
+                <section className="grid gap-6 xl:grid-cols-2">
+                    <AssetAllocationChart categories={data.netWorth.breakdownByCategory} />
+                    <PortfolioExposureChart holdings={data.portfolio.holdings} />
+                </section>
 
-            <div className="grid gap-6 lg:grid-cols-2">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Net worth distribution</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        {data.netWorth.breakdownByCategory.length === 0 ? (
-                            <p className="py-10 text-center text-sm text-muted-foreground">There are no categorized assets yet.</p>
-                        ) : (
-                            <div className="space-y-5">
-                                {data.netWorth.breakdownByCategory
-                                    .slice()
-                                    .sort((left, right) => right.totalValue - left.totalValue)
-                                    .map((item) => {
-                                        const categoryTotal = categoryTotals[item.currency] ?? 0;
-                                        const percentage = categoryTotal > 0 ? (item.totalValue / categoryTotal) * 100 : 0;
+                <section>
+                    <SalaryTrendChart salaries={data.salaries.data} />
+                </section>
+
+                <section className="grid gap-6 xl:grid-cols-[1.55fr_0.75fr]">
+                    <Card className="overflow-hidden border-border/70 bg-card/80 shadow-sm">
+                        <CardHeader className="border-b border-border/60 bg-muted/[0.12]">
+                            <div className="flex items-start justify-between gap-4">
+                                <div>
+                                    <CardTitle className="text-base">Open positions</CardTitle>
+                                    <CardDescription className="mt-1.5">Cost basis and portfolio concentration</CardDescription>
+                                </div>
+                                <Badge variant="secondary" className="font-mono">{holdings.length} active</Badge>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="overflow-x-auto p-0">
+                            {holdings.length === 0 ? (
+                                <p className="py-14 text-center text-sm text-muted-foreground">There are no open positions yet.</p>
+                            ) : (
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow className="border-border/60 hover:bg-transparent">
+                                            <TableHead className="pl-6">Asset</TableHead>
+                                            <TableHead className="text-right">Units</TableHead>
+                                            <TableHead className="text-right">Cost basis</TableHead>
+                                            <TableHead className="w-44 pr-6">Portfolio weight</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {holdings.slice(0, 10).map((holding, index) => {
+                                            const portfolioCostBasis = data.portfolio.totalCostBasis;
+                                            const weight = portfolioCostBasis !== null && portfolioCostBasis > 0
+                                                ? (holding.totalCostBasis / portfolioCostBasis) * 100
+                                                : 0;
+                                            return (
+                                                <TableRow key={`${holding.symbol}-${holding.currency}`} className="border-border/50 transition-colors hover:bg-muted/25">
+                                                    <TableCell className="pl-6">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border/70 bg-gradient-to-br from-primary/15 to-primary/[0.03] text-xs font-bold text-primary">
+                                                                {(holding.symbol || holding.name || "?").slice(0, 2).toUpperCase()}
+                                                            </div>
+                                                            <div className="min-w-0">
+                                                                <div className="max-w-[260px] truncate font-medium">{holding.name || holding.symbol}</div>
+                                                                <div className="mt-0.5 text-xs text-muted-foreground">
+                                                                    {holding.symbol}{holding.isin ? ` · ${holding.isin}` : ""} · {holding.currency}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </TableCell>
+                                                    <TableCell className="text-right tabular-nums">{numberFormatter.format(holding.remainingShares)}</TableCell>
+                                                    <TableCell className="text-right font-medium tabular-nums">{formatCurrency(holding.totalCostBasis)}</TableCell>
+                                                    <TableCell className="pr-6">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                                                                <div
+                                                                    className="h-full rounded-full bg-gradient-to-r from-violet-500 to-blue-500"
+                                                                    style={{ width: `${Math.min(weight, 100)}%`, opacity: Math.max(0.45, 1 - index * 0.06) }}
+                                                                />
+                                                            </div>
+                                                            <span className="w-11 text-right text-xs font-semibold tabular-nums">{weight.toFixed(1)}%</span>
+                                                        </div>
+                                                    </TableCell>
+                                                </TableRow>
+                                            );
+                                        })}
+                                    </TableBody>
+                                </Table>
+                            )}
+                        </CardContent>
+                    </Card>
+
+                    <Card className="relative overflow-hidden border-border/70 bg-card/80 shadow-sm">
+                        <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-emerald-500/[0.08] to-transparent" />
+                        <CardHeader className="relative">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <CardTitle className="text-base">Income snapshot</CardTitle>
+                                    <CardDescription className="mt-1.5">Current year take-home view</CardDescription>
+                                </div>
+                                <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-2.5 text-emerald-400">
+                                    <CircleDollarSign className="h-4 w-4" />
+                                </div>
+                            </div>
+                        </CardHeader>
+                        <CardContent className="relative space-y-6">
+                            <div>
+                                <div className="flex items-end justify-between gap-4">
+                                    <div>
+                                        <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Take-home rate</p>
+                                        <p className="mt-2 text-4xl font-bold tracking-tight text-emerald-500">{salaryMetrics.takeHomeRate.toFixed(1)}%</p>
+                                    </div>
+                                    <p className="pb-1 text-xs text-muted-foreground">Net / gross</p>
+                                </div>
+                                <div className="mt-4 h-2 overflow-hidden rounded-full bg-muted">
+                                    <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-cyan-400" style={{ width: `${Math.min(salaryMetrics.takeHomeRate, 100)}%` }} />
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="rounded-xl border border-border/70 bg-muted/20 p-3.5">
+                                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Gross</p>
+                                    <p className="mt-1.5 font-bold tabular-nums">{formatCurrency(salaryMetrics.gross)}</p>
+                                </div>
+                                <div className="rounded-xl border border-emerald-500/15 bg-emerald-500/[0.07] p-3.5">
+                                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-500">Net</p>
+                                    <p className="mt-1.5 font-bold tabular-nums">{formatCurrency(salaryMetrics.net)}</p>
+                                </div>
+                            </div>
+
+                            <div className="border-t border-border/60 pt-5">
+                                <p className="text-xs text-muted-foreground">Latest income</p>
+                                <div className="mt-2 flex items-center justify-between gap-3">
+                                    <div className="min-w-0">
+                                        <p className="truncate text-sm font-medium">{salaryMetrics.latest?.company || "No income recorded"}</p>
+                                        <p className="mt-0.5 text-xs text-muted-foreground">{salaryMetrics.latest ? formatDate(salaryMetrics.latest.date) : "—"}</p>
+                                    </div>
+                                    <p className="shrink-0 font-bold tabular-nums">
+                                        {salaryMetrics.latest ? formatCurrency(Number(salaryMetrics.latest.netSalary ?? 0)) : "—"}
+                                    </p>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </section>
+
+                <section>
+                    <Card className="overflow-hidden border-border/70 bg-card/80 shadow-sm">
+                        <CardHeader className="border-b border-border/60 bg-muted/[0.12]">
+                            <div className="flex items-start justify-between gap-4">
+                                <div>
+                                    <CardTitle className="text-base">Recent activity</CardTitle>
+                                    <CardDescription className="mt-1.5">Latest portfolio movements</CardDescription>
+                                </div>
+                                <Activity className="h-4 w-4 text-muted-foreground" />
+                            </div>
+                        </CardHeader>
+                        <CardContent className="p-0">
+                            {data.transactions.data.length === 0 ? (
+                                <p className="py-14 text-center text-sm text-muted-foreground">No recent transactions.</p>
+                            ) : (
+                                <div className="divide-y divide-border/50">
+                                    {data.transactions.data.map((transaction) => {
+                                        const isPositive = transactionIsPositive(transaction);
                                         return (
-                                            <div key={`${item.category}-${item.currency}`} className="space-y-2">
-                                                <div className="flex items-center justify-between text-sm">
-                                                    <span className="font-medium">{item.category}</span>
-                                                    <span className="text-muted-foreground">{formatCurrency(item.totalValue, item.currency)}</span>
+                                            <div key={transaction.id} className="grid gap-3 px-5 py-4 transition-colors hover:bg-muted/20 sm:grid-cols-[auto_1fr_auto_auto] sm:items-center md:px-6">
+                                                <div className={`flex h-9 w-9 items-center justify-center rounded-xl border ${isPositive ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-500" : "border-rose-500/20 bg-rose-500/10 text-rose-500"}`}>
+                                                    {isPositive ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
                                                 </div>
-                                                <div className="h-2 overflow-hidden rounded-full bg-muted">
-                                                    <div className="h-full rounded-full bg-primary" style={{ width: `${percentage}%` }} />
+                                                <div className="min-w-0">
+                                                    <p className="truncate text-sm font-medium">{transaction.name || transaction.symbol || transaction.type}</p>
+                                                    <p className="mt-0.5 text-xs text-muted-foreground">
+                                                        {formatDate(transaction.date)}
+                                                        {transaction.symbol ? ` · ${transaction.symbol}` : ""}
+                                                        {transaction.isin ? ` · ${transaction.isin}` : ""}
+                                                    </p>
                                                 </div>
-                                                <p className="text-xs text-muted-foreground">{percentage.toFixed(1)}% · {item.count} asset{item.count === 1 ? "" : "s"}</p>
+                                                <Badge variant="secondary" className="w-fit font-normal">{displayTransactionType(transaction.type, transaction.side)}</Badge>
+                                                <p className={`text-right text-sm font-semibold tabular-nums ${isPositive ? "text-emerald-500" : "text-foreground"}`}>
+                                                    {isPositive ? "+" : ""}{formatCurrency(transaction.value, transaction.currency)}
+                                                </p>
                                             </div>
                                         );
                                     })}
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Portfolio exposure</CardTitle>
-                    </CardHeader>
-                    <CardContent className="overflow-x-auto">
-                        {holdings.length === 0 ? (
-                            <p className="py-10 text-center text-sm text-muted-foreground">There are no open positions yet.</p>
-                        ) : (
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Asset</TableHead>
-                                        <TableHead className="text-right">Units</TableHead>
-                                        <TableHead className="text-right">Cost</TableHead>
-                                        <TableHead className="text-right">Weight</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {holdings.slice(0, 8).map((holding) => {
-                                        const portfolioCostBasis = data.portfolio.totalCostBasis;
-                                        const weight = portfolioCostBasis !== null && portfolioCostBasis > 0
-                                            ? (holding.totalCostBasis / portfolioCostBasis) * 100
-                                            : 0;
-                                        return (
-                                            <TableRow key={`${holding.symbol}-${holding.currency}`}>
-                                                <TableCell>
-                                                    <div className="font-medium">{holding.name || holding.symbol}</div>
-                                                    <div className="text-xs text-muted-foreground">
-                                                        {holding.symbol}
-                                                        {holding.isin ? ` · ISIN ${holding.isin}` : ''}
-                                                        {` · ${holding.currency}`}
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell className="text-right">{numberFormatter.format(holding.remainingShares)}</TableCell>
-                                                <TableCell className="text-right">{formatCurrency(holding.totalCostBasis)}</TableCell>
-                                                <TableCell className="text-right">{weight.toFixed(1)}%</TableCell>
-                                            </TableRow>
-                                        );
-                                    })}
-                                </TableBody>
-                            </Table>
-                        )}
-                    </CardContent>
-                </Card>
-            </div>
-
-            <div className="grid gap-6 lg:grid-cols-[1fr_1.4fr]">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Income summary</CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div className="flex items-center justify-between border-b pb-3 text-sm">
-                            <span className="text-muted-foreground">Annual gross</span>
-                            <span className="font-semibold">{formatCurrency(salaryMetrics.gross)}</span>
-                        </div>
-                        <div className="flex items-center justify-between border-b pb-3 text-sm">
-                            <span className="text-muted-foreground">Annual net</span>
-                            <span className="font-semibold">{formatCurrency(salaryMetrics.net)}</span>
-                        </div>
-                        <div className="flex items-center justify-between text-sm">
-                            <span className="text-muted-foreground">Latest salary</span>
-                            <span className="font-semibold">
-                                {salaryMetrics.latest ? formatCurrency(Number(salaryMetrics.latest.netSalary ?? 0)) : "—"}
-                            </span>
-                        </div>
-                        {salaryMetrics.latest && (
-                            <p className="text-xs text-muted-foreground">
-                                {salaryMetrics.latest.company || "Unknown company"} · {formatDate(salaryMetrics.latest.date)}
-                            </p>
-                        )}
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Recent activity</CardTitle>
-                    </CardHeader>
-                    <CardContent className="overflow-x-auto">
-                        {data.transactions.data.length === 0 ? (
-                            <p className="py-10 text-center text-sm text-muted-foreground">No recent transactions.</p>
-                        ) : (
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Date</TableHead>
-                                        <TableHead>Description</TableHead>
-                                        <TableHead>Type</TableHead>
-                                        <TableHead className="text-right">Amount</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {data.transactions.data.map((transaction) => (
-                                        <TableRow key={transaction.id}>
-                                            <TableCell className="whitespace-nowrap">{formatDate(transaction.date)}</TableCell>
-                                            <TableCell className="font-medium">
-                                                {transaction.name || transaction.symbol || transaction.type}
-                                                {(transaction.symbol || transaction.isin) && (
-                                                    <div className="text-xs text-muted-foreground">
-                                                        {transaction.symbol}
-                                                        {transaction.isin ? ` · ISIN ${transaction.isin}` : ''}
-                                                    </div>
-                                                )}
-                                            </TableCell>
-                                            <TableCell className="text-muted-foreground">{displayTransactionType(transaction.type, transaction.side)}</TableCell>
-                                            <TableCell className="text-right">
-                                                {formatCurrency(transaction.value)}
-                                                <span className="ml-1 text-xs text-muted-foreground">{transaction.currency}</span>
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
-                        )}
-                    </CardContent>
-                </Card>
+                                </div>
+                            )}
+                        </CardContent>
+                    </Card>
+                </section>
             </div>
         </div>
     );
