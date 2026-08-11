@@ -17,6 +17,16 @@ enum TradeSide {
   Sell
 }
 
+enum InstrumentType {
+  STOCK
+  ETF
+  FUND
+  CRYPTO
+  INDEX
+  FOREX
+  OTHER
+}
+
 enum ProjectEntryType {
   INCOME
   EXPENSE
@@ -34,26 +44,27 @@ enum ProjectPaymentStatus {
 }
 
 model User {
-  id                 String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  email              String              @unique @db.VarChar(255)
-  passwordHash       String              @map("password_hash") @db.VarChar(255)
-  name               String?             @db.VarChar(100)
-  avatarIcon         String              @default("user-round") @db.VarChar(32)
-  avatarColor        String              @default("slate") @db.VarChar(24)
-  locale             String              @default("es-ES") @db.VarChar(10)
-  timezone           String              @default("Europe/Madrid") @db.VarChar(64)
-  preferredCurrency  Currency            @default(EUR)
-  sessionVersion     Int                 @default(0)
-  createdAt          DateTime            @default(now()) @db.Timestamptz(6)
-  updatedAt          DateTime            @default(now()) @updatedAt @db.Timestamptz(6)
+  id                 String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email              String                   @unique @db.VarChar(255)
+  passwordHash       String                   @map("password_hash") @db.VarChar(255)
+  name               String?                  @db.VarChar(100)
+  avatarIcon         String                   @default("user-round") @db.VarChar(32)
+  avatarColor        String                   @default("slate") @db.VarChar(24)
+  locale             String                   @default("es-ES") @db.VarChar(10)
+  timezone           String                   @default("Europe/Madrid") @db.VarChar(64)
+  preferredCurrency  Currency                 @default(EUR)
+  sessionVersion     Int                      @default(0)
+  createdAt          DateTime                 @default(now()) @db.Timestamptz(6)
+  updatedAt          DateTime                 @default(now()) @updatedAt @db.Timestamptz(6)
   stockTrades        StockTrade[]
   cashTransfers      CashTransfer[]
   netWorthAssets     NetWorthAsset[]
   salaryRecords      SalaryRecord[]
   importHistory      ImportHistory[]
   salaryPdfPasswords SalaryPdfPassword[]
-  taxReturns        TaxReturn[]
+  taxReturns         TaxReturn[]
   projects           Project[]
+  portfolioSnapshots PortfolioDailySnapshot[]
 
   @@map("users")
 }
@@ -76,24 +87,24 @@ model Project {
 }
 
 model ProjectEntry {
-  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  projectId      String           @db.Uuid
+  id             String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  projectId      String               @db.Uuid
   type           ProjectEntryType
-  amount         Decimal          @db.Decimal(14, 2)
+  amount         Decimal              @db.Decimal(14, 2)
   description    String
   category       String?
   counterparty   String?
   reference      String?
   notes          String?
   paymentStatus  ProjectPaymentStatus @default(PAID)
-  date           DateTime         @db.Date
-  dueDate        DateTime?        @db.Date
+  date           DateTime             @db.Date
+  dueDate        DateTime?            @db.Date
   fileName       String?
   fileStorageKey String?
   fileMimeType   String?
-  createdAt      DateTime         @default(now()) @db.Timestamptz(6)
-  updatedAt      DateTime         @default(now()) @updatedAt @db.Timestamptz(6)
-  project        Project          @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  createdAt      DateTime             @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime             @default(now()) @updatedAt @db.Timestamptz(6)
+  project        Project              @relation(fields: [projectId], references: [id], onDelete: Cascade)
 
   @@index([projectId])
   @@index([projectId, date])
@@ -102,33 +113,159 @@ model ProjectEntry {
 }
 
 model StockTrade {
-  id                String    @id
-  date              DateTime  @db.Timestamp(3)
+  id                String         @id
+  date              DateTime       @db.Timestamp(3)
   currency          Currency
   symbol            String
-  isin              String?   @db.VarChar(20)
-  name              String?   @db.VarChar(255)
+  isin              String?        @db.VarChar(20)
+  name              String?        @db.VarChar(255)
   assetType         String?
-  type              String    @default("Trade - Market")
-  quantity          Decimal   @db.Decimal(20, 8)
-  price             Decimal   @db.Decimal(20, 8)
+  type              String         @default("Trade - Market")
+  quantity          Decimal        @db.Decimal(20, 8)
+  price             Decimal        @db.Decimal(20, 8)
   side              TradeSide
-  value             Decimal   @db.Decimal(20, 8)
+  value             Decimal        @db.Decimal(20, 8)
   eurCost           Float?
-  eurValue          Decimal?  @db.Decimal(20, 8)
+  eurValue          Decimal?       @db.Decimal(20, 8)
   conversionRate    Float?
   costBasisOverride Float?
-  fees              Decimal   @db.Decimal(20, 8)
-  commission        Decimal   @db.Decimal(20, 8)
+  fees              Decimal        @db.Decimal(20, 8)
+  commission        Decimal        @db.Decimal(20, 8)
   source            String?
-  userId            String?   @db.Uuid
-  createdAt         DateTime  @default(now()) @db.Timestamp(3)
-  updatedAt         DateTime  @db.Timestamp(3)
-  user              User?     @relation(fields: [userId], references: [id])
+  userId            String?        @db.Uuid
+  instrumentId      String?        @db.Uuid
+  listingId         String?        @db.Uuid
+  createdAt         DateTime       @default(now()) @db.Timestamp(3)
+  updatedAt         DateTime       @db.Timestamp(3)
+  user              User?          @relation(fields: [userId], references: [id])
+  instrument        Instrument?    @relation(fields: [instrumentId], references: [id])
+  listing           MarketListing? @relation(fields: [listingId], references: [id])
 
   @@unique([userId, date, currency, symbol, side, quantity, price])
   @@index([userId])
+  @@index([instrumentId])
+  @@index([listingId])
   @@map("stock_trades")
+}
+
+model Instrument {
+  id                String                           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  canonicalKey      String                           @unique @db.VarChar(255)
+  isin              String?                          @unique @db.VarChar(20)
+  figi              String?                          @unique @db.VarChar(32)
+  name              String                           @db.VarChar(255)
+  type              InstrumentType                   @default(OTHER)
+  createdAt         DateTime                         @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime                         @default(now()) @updatedAt @db.Timestamptz(6)
+  listings          MarketListing[]
+  stockTrades       StockTrade[]
+  positionSnapshots PortfolioPositionDailySnapshot[]
+
+  @@index([name])
+  @@map("instruments")
+}
+
+model MarketListing {
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  instrumentId   String           @db.Uuid
+  ticker         String           @db.VarChar(64)
+  exchangeCode   String?          @db.VarChar(32)
+  exchangeMic    String?          @db.VarChar(8)
+  currency       Currency
+  provider       String           @db.VarChar(32)
+  providerSymbol String           @db.VarChar(128)
+  isPrimary      Boolean          @default(false)
+  createdAt      DateTime         @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime         @default(now()) @updatedAt @db.Timestamptz(6)
+  instrument     Instrument       @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+  prices         MarketPriceBar[]
+  stockTrades    StockTrade[]
+
+  @@unique([provider, providerSymbol])
+  @@index([instrumentId])
+  @@index([ticker])
+  @@map("market_listings")
+}
+
+model MarketPriceBar {
+  id            String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  listingId     String        @db.Uuid
+  date          DateTime      @db.Date
+  open          Decimal?      @db.Decimal(20, 8)
+  high          Decimal?      @db.Decimal(20, 8)
+  low           Decimal?      @db.Decimal(20, 8)
+  close         Decimal       @db.Decimal(20, 8)
+  adjustedClose Decimal?      @db.Decimal(20, 8)
+  volume        Decimal?      @db.Decimal(30, 8)
+  currency      Currency
+  source        String        @db.VarChar(32)
+  createdAt     DateTime      @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime      @default(now()) @updatedAt @db.Timestamptz(6)
+  listing       MarketListing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  @@unique([listingId, date, source])
+  @@index([date])
+  @@map("market_price_bars")
+}
+
+model MarketFxRate {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  date          DateTime @db.Date
+  baseCurrency  Currency
+  quoteCurrency Currency
+  rate          Decimal  @db.Decimal(20, 10)
+  source        String   @db.VarChar(32)
+  createdAt     DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt     DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+
+  @@unique([date, baseCurrency, quoteCurrency, source])
+  @@index([date])
+  @@map("market_fx_rates")
+}
+
+model PortfolioDailySnapshot {
+  id               String                           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId           String                           @db.Uuid
+  date             DateTime                         @db.Date
+  currency         Currency                         @default(EUR)
+  marketValue      Decimal                          @db.Decimal(20, 8)
+  costBasis        Decimal                          @db.Decimal(20, 8)
+  realizedGain     Decimal                          @db.Decimal(20, 8)
+  unrealizedGain   Decimal                          @db.Decimal(20, 8)
+  dividends        Decimal                          @default(0) @db.Decimal(20, 8)
+  fees             Decimal                          @default(0) @db.Decimal(20, 8)
+  netContributions Decimal                          @default(0) @db.Decimal(20, 8)
+  dailyPnl         Decimal                          @default(0) @db.Decimal(20, 8)
+  hasEstimates     Boolean                          @default(false)
+  createdAt        DateTime                         @default(now()) @db.Timestamptz(6)
+  updatedAt        DateTime                         @default(now()) @updatedAt @db.Timestamptz(6)
+  user             User                             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  positions        PortfolioPositionDailySnapshot[]
+
+  @@unique([userId, date, currency])
+  @@index([userId, date])
+  @@map("portfolio_daily_snapshots")
+}
+
+model PortfolioPositionDailySnapshot {
+  id                String                 @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  snapshotId        String                 @db.Uuid
+  instrumentId      String                 @db.Uuid
+  quantity          Decimal                @db.Decimal(20, 8)
+  price             Decimal                @db.Decimal(20, 8)
+  priceCurrency     Currency
+  fxRateToReporting Decimal                @db.Decimal(20, 10)
+  marketValue       Decimal                @db.Decimal(20, 8)
+  costBasis         Decimal                @db.Decimal(20, 8)
+  unrealizedGain    Decimal                @db.Decimal(20, 8)
+  priceDate         DateTime               @db.Date
+  isEstimated       Boolean                @default(false)
+  snapshot          PortfolioDailySnapshot @relation(fields: [snapshotId], references: [id], onDelete: Cascade)
+  instrument        Instrument             @relation(fields: [instrumentId], references: [id], onDelete: Cascade)
+
+  @@unique([snapshotId, instrumentId])
+  @@index([instrumentId])
+  @@map("portfolio_position_daily_snapshots")
 }
 
 model CashTransfer {
@@ -254,22 +391,22 @@ model SalaryPdfPassword {
 }
 
 model TaxReturn {
-  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   taxYear        Int
-  country        String   @default("Spain") @db.VarChar(80)
-  status         String   @default("Draft") @db.VarChar(32)
-  totalIncome    Decimal  @default(0) @db.Decimal(14, 2)
-  taxPaid       Decimal  @default(0) @db.Decimal(14, 2)
-  finalTaxResult Decimal? @map("final_tax_result") @db.Decimal(14, 2)
+  country        String    @default("Spain") @db.VarChar(80)
+  status         String    @default("Draft") @db.VarChar(32)
+  totalIncome    Decimal   @default(0) @db.Decimal(14, 2)
+  taxPaid        Decimal   @default(0) @db.Decimal(14, 2)
+  finalTaxResult Decimal?  @map("final_tax_result") @db.Decimal(14, 2)
   filingDate     DateTime? @db.Date
   notes          String?
   fileName       String?
   fileStorageKey String?
   fileMimeType   String?
-  userId         String   @db.Uuid
-  createdAt      DateTime @default(now()) @db.Timestamptz(6)
-  updatedAt      DateTime @default(now()) @updatedAt @db.Timestamptz(6)
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId         String    @db.Uuid
+  createdAt      DateTime  @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime  @default(now()) @updatedAt @db.Timestamptz(6)
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([userId, taxYear])
