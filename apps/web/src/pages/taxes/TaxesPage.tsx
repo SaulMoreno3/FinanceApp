@@ -106,7 +106,10 @@ export default function TaxesPage() {
     const totalIncome = annualSummaries.reduce((sum, year) => sum + year.totalIncome, 0);
     const totalTaxPaid = annualSummaries.reduce((sum, year) => sum + year.taxPaid, 0);
     const totalNetIncome = annualSummaries.reduce(
-        (sum, year) => sum + year.totalIncome - (year.finalTaxResult ?? year.taxPaid),
+        (sum, year) => {
+            const finalAdjustment = year.finalTaxResult === null ? 0 : -year.finalTaxResult;
+            return sum + year.totalIncome - year.taxPaid + finalAdjustment;
+        },
         0,
     );
 
