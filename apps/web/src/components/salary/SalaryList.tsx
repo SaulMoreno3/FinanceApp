@@ -147,10 +147,10 @@ export default function SalaryList({ refreshTrigger, onView, onEdit }: SalaryLis
                                         <span className="font-semibold text-foreground/80">{salary.company || "Unknown"}</span>
                                     </TableCell>
                                     <TableCell className="text-right text-muted-foreground">
-                                        {salary.grossSalary ? `€${salary.grossSalary.toLocaleString()}` : "-"}
+                                        {salary.grossSalary ? `€${salary.grossSalary.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "-"}
                                     </TableCell>
                                     <TableCell className="text-right font-bold text-emerald-600 dark:text-emerald-500">
-                                        {salary.netSalary ? `€${salary.netSalary.toLocaleString()}` : "-"}
+                                        {salary.netSalary ? `€${salary.netSalary.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "-"}
                                     </TableCell>
                                     <TableCell>
                                         {salary.fileName ? (
