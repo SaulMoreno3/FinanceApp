@@ -46,6 +46,28 @@ function isInternalTransfer(type: string): boolean {
     return type.trim().toLowerCase() === 'internaltransfer';
 }
 
+export function calculateBuyAccounting(
+    nativeValue: number,
+    nativeFees: number,
+    fxRate: number,
+    costBasisOverride: number | null,
+): { cashFlow: number; costBasis: number } {
+    const cashFlow = (nativeValue + nativeFees) * fxRate;
+    return {
+        cashFlow,
+        costBasis: costBasisOverride ?? cashFlow,
+    };
+}
+
+export function calculateDailyPerformance(
+    marketValue: number,
+    previousMarketValue: number,
+    netContributions: number,
+    dividends: number,
+): number {
+    return marketValue - previousMarketValue - netContributions + dividends;
+}
+
 export type PortfolioHistoryRange = '1D' | '1W' | '1M' | 'YTD' | '1Y' | 'MAX';
 
 export class PortfolioHistoryService {
@@ -160,17 +182,21 @@ export class PortfolioHistoryService {
                 dayFees += nativeFees * tradeFx;
 
                 if (trade.side === TradeSide.Buy) {
-                    const cashFlow = (nativeValue + nativeFees) * tradeFx;
-                    const totalCost = trade.costBasisOverride ?? cashFlow;
+                    const accounting = calculateBuyAccounting(
+                        nativeValue,
+                        nativeFees,
+                        tradeFx,
+                        trade.costBasisOverride,
+                    );
                     state.quantity += Number(trade.quantity);
                     state.lots.push({
                         quantity: Number(trade.quantity),
-                        unitCost: totalCost / Number(trade.quantity),
+                        unitCost: accounting.costBasis / Number(trade.quantity),
                         estimated,
                     });
                     // A transferred tax basis belongs to the lot, but it is not
                     // the cash flow shown by the broker on the subscription day.
-                    netContributions += cashFlow;
+                    netContributions += accounting.cashFlow;
                 } else {
                     const consumedCost = consumeLots(state.lots, Number(trade.quantity));
                     const proceeds = (nativeValue - nativeFees) * tradeFx;
@@ -216,7 +242,12 @@ export class PortfolioHistoryService {
             }
 
             const dayDividends = dividendsByDate.get(key) ?? 0;
-            const dailyPnl = marketValue - previousMarketValue - netContributions + dayDividends;
+            const dailyPnl = calculateDailyPerformance(
+                marketValue,
+                previousMarketValue,
+                netContributions,
+                dayDividends,
+            );
             snapshots.push({
                 date: currentDate,
                 marketValue,
