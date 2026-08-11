@@ -22,6 +22,13 @@ interface TaxReturn {
     createdAt: string;
 }
 
+interface AnnualSummary {
+    taxYear: number;
+    totalIncome: number;
+    taxPaid: number;
+    source: "tax_return" | "salary_records";
+}
+
 interface TaxReturnForm {
     taxYear: string;
     country: string;
@@ -56,6 +63,7 @@ const formatCurrency = (value: number) => new Intl.NumberFormat("en-GB", {
 
 export default function TaxesPage() {
     const [taxReturns, setTaxReturns] = useState<TaxReturn[]>([]);
+    const [annualSummaries, setAnnualSummaries] = useState<AnnualSummary[]>([]);
     const [form, setForm] = useState<TaxReturnForm>(initialForm);
     const [file, setFile] = useState<File | null>(null);
     const [isFormOpen, setIsFormOpen] = useState(false);
@@ -67,8 +75,12 @@ export default function TaxesPage() {
     const loadTaxReturns = async () => {
         setLoading(true);
         try {
-            const response = await fetchAPI<{ data: TaxReturn[] }>("/taxes");
-            setTaxReturns(response.data);
+            const [returnsResponse, summaryResponse] = await Promise.all([
+                fetchAPI<{ data: TaxReturn[] }>("/taxes"),
+                fetchAPI<{ data: AnnualSummary[] }>("/taxes/summary"),
+            ]);
+            setTaxReturns(returnsResponse.data);
+            setAnnualSummaries(summaryResponse.data);
             setError(null);
         } catch (loadError) {
             setError(loadError instanceof Error ? loadError.message : "Unable to load tax returns.");
@@ -86,18 +98,6 @@ export default function TaxesPage() {
     }, [viewer]);
 
     const latestYear = useMemo(() => taxReturns[0]?.taxYear ?? null, [taxReturns]);
-    const annualSummaries = useMemo(() => {
-        const byYear = new Map<number, { taxYear: number; totalIncome: number; taxPaid: number; filings: number }>();
-        for (const taxReturn of taxReturns) {
-            const current = byYear.get(taxReturn.taxYear) ?? { taxYear: taxReturn.taxYear, totalIncome: 0, taxPaid: 0, filings: 0 };
-            current.totalIncome += Number(taxReturn.totalIncome ?? 0);
-            current.taxPaid += Number(taxReturn.taxPaid ?? 0);
-            current.filings += 1;
-            byYear.set(taxReturn.taxYear, current);
-        }
-        return [...byYear.values()].sort((left, right) => right.taxYear - left.taxYear);
-    }, [taxReturns]);
-
     const totalIncome = annualSummaries.reduce((sum, year) => sum + year.totalIncome, 0);
     const totalTaxPaid = annualSummaries.reduce((sum, year) => sum + year.taxPaid, 0);
 
@@ -187,13 +187,13 @@ export default function TaxesPage() {
                         <p className="py-8 text-center text-sm text-muted-foreground">Add a tax return to see annual income and tax paid.</p>
                     ) : (
                         <div className="space-y-3">
-                            <div className="hidden grid-cols-4 gap-4 border-b pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground md:grid"><span>Tax year</span><span>Income</span><span>Tax paid</span><span>Filings</span></div>
+                            <div className="hidden grid-cols-4 gap-4 border-b pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground md:grid"><span>Tax year</span><span>Income</span><span>Tax paid</span><span>Source</span></div>
                             {annualSummaries.map((year) => (
                                 <div key={year.taxYear} className="grid gap-2 rounded-lg border p-3 md:grid-cols-4 md:items-center md:border-0 md:p-0">
                                     <span className="font-semibold">{year.taxYear}</span>
                                     <span><span className="mr-2 text-xs text-muted-foreground md:hidden">Income</span>{formatCurrency(year.totalIncome)}</span>
                                     <span className="text-rose-500"><span className="mr-2 text-xs text-muted-foreground md:hidden">Tax paid</span>{formatCurrency(year.taxPaid)}</span>
-                                    <span className="text-sm text-muted-foreground"><span className="mr-2 text-xs md:hidden">Filings</span>{year.filings}</span>
+                                    <span className="text-sm text-muted-foreground"><span className="mr-2 text-xs md:hidden">Source</span>{year.source === "tax_return" ? "Tax return" : "Salary records"}</span>
                                 </div>
                             ))}
                         </div>
