@@ -13,6 +13,7 @@ import { fetchAPI, fetchBlob } from "@/lib/api";
 import { FileText, Eye, ArrowLeft, Building2, Loader2, ZoomIn, ZoomOut } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { formatEuro } from "./salary.format";
 
 GlobalWorkerOptions.workerSrc = pdfWorker;
 
@@ -173,7 +174,7 @@ export default function SalaryDetailModal({ salaryId, onClose }: SalaryDetailMod
                             {payments.map((item, i) => (
                                 <div key={i} className="flex justify-between gap-4 text-sm">
                                     <span>{item.concept}</span>
-                                    <span className="shrink-0 font-medium">€{item.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                                    <span className="shrink-0 font-medium">{formatEuro(item.amount)}</span>
                                 </div>
                             ))}
                         </div>
@@ -187,7 +188,7 @@ export default function SalaryDetailModal({ salaryId, onClose }: SalaryDetailMod
                             {deductions.map((item, i) => (
                                 <div key={i} className="flex justify-between gap-4 text-sm text-muted-foreground">
                                     <span>{item.concept}</span>
-                                    <span className="shrink-0 text-rose-500">- €{item.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}</span>
+                                    <span className="shrink-0 text-rose-500">−{formatEuro(item.amount)}</span>
                                 </div>
                             ))}
                         </div>
@@ -202,11 +203,11 @@ export default function SalaryDetailModal({ salaryId, onClose }: SalaryDetailMod
             <div className="border-t pt-4 border-dashed">
                 <div className="flex justify-between items-center text-sm text-muted-foreground mb-1">
                     <span>Gross Total</span>
-                    <span>€{data.grossSalary?.toLocaleString('en-US', { minimumFractionDigits: 2 }) || '0.00'}</span>
+                    <span>{formatEuro(data.grossSalary)}</span>
                 </div>
                 <div className="flex justify-between items-center text-2xl font-bold bg-muted/30 p-4 rounded-lg mt-2">
                     <span>Net Pay</span>
-                    <span className="text-emerald-600">€{data.netSalary?.toLocaleString('en-US', { minimumFractionDigits: 2 }) || '0.00'}</span>
+                    <span className="text-emerald-600">{formatEuro(data.netSalary)}</span>
                 </div>
             </div>
 

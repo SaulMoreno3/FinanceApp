@@ -16,6 +16,7 @@ import { format } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { TableSkeleton } from "@/components/common/TableSkeleton";
+import { formatEuro } from "./salary.format";
 
 interface SalaryListProps {
     refreshTrigger: number;
@@ -89,7 +90,7 @@ export default function SalaryList({ refreshTrigger, onView, onEdit }: SalaryLis
                         <DollarSign className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">€{totalNet.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
+                        <div className="text-2xl font-bold">{formatEuro(totalNet)}</div>
                         <p className="text-xs text-muted-foreground">Lifetime earnings</p>
                     </CardContent>
                 </Card>
@@ -99,7 +100,7 @@ export default function SalaryList({ refreshTrigger, onView, onEdit }: SalaryLis
                         <TrendingUp className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">€{averageNet.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
+                        <div className="text-2xl font-bold">{formatEuro(averageNet)}</div>
                         <p className="text-xs text-muted-foreground">Per payroll</p>
                     </CardContent>
                 </Card>
@@ -109,7 +110,7 @@ export default function SalaryList({ refreshTrigger, onView, onEdit }: SalaryLis
                         <Calendar className="h-4 w-4 text-muted-foreground" />
                     </CardHeader>
                     <CardContent>
-                        <div className="text-2xl font-bold">€{lastMonth?.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
+                        <div className="text-2xl font-bold">{formatEuro(lastMonth)}</div>
                         <p className="text-xs text-muted-foreground">
                             {salaries.length > 0 ? format(new Date(salaries[0].date), "MMMM yyyy") : "-"}
                         </p>
@@ -147,10 +148,10 @@ export default function SalaryList({ refreshTrigger, onView, onEdit }: SalaryLis
                                         <span className="font-semibold text-foreground/80">{salary.company || "Unknown"}</span>
                                     </TableCell>
                                     <TableCell className="text-right text-muted-foreground">
-                                        {salary.grossSalary ? `€${salary.grossSalary.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "-"}
+                                        {salary.grossSalary != null ? formatEuro(salary.grossSalary) : "-"}
                                     </TableCell>
                                     <TableCell className="text-right font-bold text-emerald-600 dark:text-emerald-500">
-                                        {salary.netSalary ? `€${salary.netSalary.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "-"}
+                                        {salary.netSalary != null ? formatEuro(salary.netSalary) : "-"}
                                     </TableCell>
                                     <TableCell>
                                         {salary.fileName ? (
