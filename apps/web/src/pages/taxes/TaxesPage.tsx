@@ -13,6 +13,8 @@ interface TaxReturn {
     taxYear: number;
     country: string;
     status: "Draft" | "Filed" | "Amended" | string;
+    totalIncome: number;
+    taxPaid: number;
     filingDate: string | null;
     notes: string | null;
     fileName: string | null;
@@ -24,6 +26,8 @@ interface TaxReturnForm {
     taxYear: string;
     country: string;
     status: "Draft" | "Filed" | "Amended";
+    totalIncome: string;
+    taxPaid: string;
     filingDate: string;
     notes: string;
 }
@@ -32,6 +36,8 @@ const initialForm: TaxReturnForm = {
     taxYear: String(new Date().getFullYear() - 1),
     country: "Spain",
     status: "Draft",
+    totalIncome: "0",
+    taxPaid: "0",
     filingDate: "",
     notes: "",
 };
@@ -41,6 +47,12 @@ const statusStyles: Record<string, string> = {
     Filed: "bg-emerald-500/10 text-emerald-600",
     Amended: "bg-amber-500/10 text-amber-600",
 };
+
+const formatCurrency = (value: number) => new Intl.NumberFormat("en-GB", {
+    style: "currency",
+    currency: "EUR",
+    maximumFractionDigits: 2,
+}).format(value);
 
 export default function TaxesPage() {
     const [taxReturns, setTaxReturns] = useState<TaxReturn[]>([]);
@@ -74,6 +86,20 @@ export default function TaxesPage() {
     }, [viewer]);
 
     const latestYear = useMemo(() => taxReturns[0]?.taxYear ?? null, [taxReturns]);
+    const annualSummaries = useMemo(() => {
+        const byYear = new Map<number, { taxYear: number; totalIncome: number; taxPaid: number; filings: number }>();
+        for (const taxReturn of taxReturns) {
+            const current = byYear.get(taxReturn.taxYear) ?? { taxYear: taxReturn.taxYear, totalIncome: 0, taxPaid: 0, filings: 0 };
+            current.totalIncome += Number(taxReturn.totalIncome ?? 0);
+            current.taxPaid += Number(taxReturn.taxPaid ?? 0);
+            current.filings += 1;
+            byYear.set(taxReturn.taxYear, current);
+        }
+        return [...byYear.values()].sort((left, right) => right.taxYear - left.taxYear);
+    }, [taxReturns]);
+
+    const totalIncome = annualSummaries.reduce((sum, year) => sum + year.totalIncome, 0);
+    const totalTaxPaid = annualSummaries.reduce((sum, year) => sum + year.taxPaid, 0);
 
     const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -84,6 +110,8 @@ export default function TaxesPage() {
         body.append("taxYear", form.taxYear);
         body.append("country", form.country);
         body.append("status", form.status);
+        body.append("totalIncome", form.totalIncome || "0");
+        body.append("taxPaid", form.taxPaid || "0");
         if (form.filingDate) body.append("filingDate", form.filingDate);
         if (form.notes) body.append("notes", form.notes);
         if (file) body.append("file", file);
@@ -139,18 +167,39 @@ export default function TaxesPage() {
 
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 <Card>
-                    <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Tax returns</CardTitle></CardHeader>
-                    <CardContent><p className="text-2xl font-bold">{taxReturns.length}</p><p className="text-xs text-muted-foreground">Saved filings</p></CardContent>
+                    <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Total income</CardTitle></CardHeader>
+                    <CardContent><p className="text-2xl font-bold">{formatCurrency(totalIncome)}</p><p className="text-xs text-muted-foreground">Across all tax years</p></CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Total tax paid</CardTitle></CardHeader>
+                    <CardContent><p className="text-2xl font-bold text-rose-500">{formatCurrency(totalTaxPaid)}</p><p className="text-xs text-muted-foreground">Across all tax years</p></CardContent>
                 </Card>
                 <Card>
                     <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Latest tax year</CardTitle></CardHeader>
-                    <CardContent><p className="text-2xl font-bold">{latestYear ?? "—"}</p><p className="text-xs text-muted-foreground">Most recent record</p></CardContent>
-                </Card>
-                <Card>
-                    <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Documents</CardTitle></CardHeader>
-                    <CardContent><p className="text-2xl font-bold">{taxReturns.filter((item) => item.fileName).length}</p><p className="text-xs text-muted-foreground">Attached files</p></CardContent>
+                    <CardContent><p className="text-2xl font-bold">{latestYear ?? "—"}</p><p className="text-xs text-muted-foreground">{taxReturns.length} saved filings</p></CardContent>
                 </Card>
             </div>
+
+            <Card>
+                <CardHeader><CardTitle>Annual tax overview</CardTitle></CardHeader>
+                <CardContent>
+                    {annualSummaries.length === 0 ? (
+                        <p className="py-8 text-center text-sm text-muted-foreground">Add a tax return to see annual income and tax paid.</p>
+                    ) : (
+                        <div className="space-y-3">
+                            <div className="hidden grid-cols-4 gap-4 border-b pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground md:grid"><span>Tax year</span><span>Income</span><span>Tax paid</span><span>Filings</span></div>
+                            {annualSummaries.map((year) => (
+                                <div key={year.taxYear} className="grid gap-2 rounded-lg border p-3 md:grid-cols-4 md:items-center md:border-0 md:p-0">
+                                    <span className="font-semibold">{year.taxYear}</span>
+                                    <span><span className="mr-2 text-xs text-muted-foreground md:hidden">Income</span>{formatCurrency(year.totalIncome)}</span>
+                                    <span className="text-rose-500"><span className="mr-2 text-xs text-muted-foreground md:hidden">Tax paid</span>{formatCurrency(year.taxPaid)}</span>
+                                    <span className="text-sm text-muted-foreground"><span className="mr-2 text-xs md:hidden">Filings</span>{year.filings}</span>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
 
             <Card>
                 <CardHeader><CardTitle>Income tax history</CardTitle></CardHeader>
@@ -173,6 +222,7 @@ export default function TaxesPage() {
                                             <div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold">Tax year {taxReturn.taxYear}</h3><Badge className={statusStyles[taxReturn.status] ?? "bg-muted"}>{taxReturn.status}</Badge></div>
                                             <p className="mt-1 text-sm text-muted-foreground">{taxReturn.country}{taxReturn.filingDate ? ` · Filed ${new Date(taxReturn.filingDate).toLocaleDateString("en-GB")}` : ""}</p>
                                             {taxReturn.notes && <p className="mt-2 truncate text-sm">{taxReturn.notes}</p>}
+                                            <p className="mt-2 text-sm"><span className="text-muted-foreground">Income:</span> {formatCurrency(Number(taxReturn.totalIncome ?? 0))} <span className="ml-3 text-muted-foreground">Tax paid:</span> <span className="text-rose-500">{formatCurrency(Number(taxReturn.taxPaid ?? 0))}</span></p>
                                             {taxReturn.fileName && <p className="mt-2 truncate text-xs text-muted-foreground">{taxReturn.fileName}</p>}
                                         </div>
                                     </div>
@@ -194,6 +244,10 @@ export default function TaxesPage() {
                         <div className="grid gap-4 sm:grid-cols-2">
                             <div className="space-y-2"><Label htmlFor="tax-year">Tax year</Label><Input id="tax-year" type="number" min="2000" max="2100" value={form.taxYear} onChange={(event) => setForm({ ...form, taxYear: event.target.value })} required /></div>
                             <div className="space-y-2"><Label htmlFor="tax-country">Country</Label><Input id="tax-country" value={form.country} onChange={(event) => setForm({ ...form, country: event.target.value })} required /></div>
+                        </div>
+                        <div className="grid gap-4 sm:grid-cols-2">
+                            <div className="space-y-2"><Label htmlFor="total-income">Total income</Label><Input id="total-income" type="number" min="0" step="0.01" value={form.totalIncome} onChange={(event) => setForm({ ...form, totalIncome: event.target.value })} required /></div>
+                            <div className="space-y-2"><Label htmlFor="tax-paid">Tax paid</Label><Input id="tax-paid" type="number" min="0" step="0.01" value={form.taxPaid} onChange={(event) => setForm({ ...form, taxPaid: event.target.value })} required /></div>
                         </div>
                         <div className="grid gap-4 sm:grid-cols-2">
                             <div className="space-y-2"><Label htmlFor="tax-status">Status</Label><select id="tax-status" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as TaxReturnForm["status"] })}><option value="Draft">Draft</option><option value="Filed">Filed</option><option value="Amended">Amended</option></select></div>
