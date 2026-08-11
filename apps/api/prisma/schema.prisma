@@ -41,6 +41,7 @@ model User {
   salaryRecords      SalaryRecord[]
   importHistory      ImportHistory[]
   salaryPdfPasswords SalaryPdfPassword[]
+  taxReturns        TaxReturn[]
   projects           Project[]
 
   @@map("users")
@@ -230,4 +231,24 @@ model SalaryPdfPassword {
 
   @@index([userId])
   @@map("salary_pdf_passwords")
+}
+
+model TaxReturn {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  taxYear        Int
+  country        String   @default("Spain") @db.VarChar(80)
+  status         String   @default("Draft") @db.VarChar(32)
+  filingDate     DateTime? @db.Date
+  notes          String?
+  fileName       String?
+  fileStorageKey String?
+  fileMimeType   String?
+  userId         String   @db.Uuid
+  createdAt      DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt      DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, taxYear])
+  @@map("tax_returns")
 }
