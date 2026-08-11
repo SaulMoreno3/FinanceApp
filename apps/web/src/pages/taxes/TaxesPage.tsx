@@ -171,7 +171,7 @@ export default function TaxesPage() {
                     <CardContent><p className="text-2xl font-bold">{formatCurrency(totalIncome)}</p><p className="text-xs text-muted-foreground">Across all tax years</p></CardContent>
                 </Card>
                 <Card>
-                    <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Total tax paid</CardTitle></CardHeader>
+                    <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Total income tax withheld</CardTitle></CardHeader>
                     <CardContent><p className="text-2xl font-bold text-rose-500">{formatCurrency(totalTaxPaid)}</p><p className="text-xs text-muted-foreground">Across all tax years</p></CardContent>
                 </Card>
                 <Card>
@@ -184,15 +184,15 @@ export default function TaxesPage() {
                 <CardHeader><CardTitle>Annual tax overview</CardTitle></CardHeader>
                 <CardContent>
                     {annualSummaries.length === 0 ? (
-                        <p className="py-8 text-center text-sm text-muted-foreground">Add a tax return to see annual income and tax paid.</p>
+                        <p className="py-8 text-center text-sm text-muted-foreground">Add a tax return to see annual income and income tax withheld.</p>
                     ) : (
                         <div className="space-y-3">
-                            <div className="hidden grid-cols-4 gap-4 border-b pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground md:grid"><span>Tax year</span><span>Income</span><span>Tax paid</span><span>Source</span></div>
+                            <div className="hidden grid-cols-4 gap-4 border-b pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground md:grid"><span>Tax year</span><span>Income</span><span>Income tax withheld</span><span>Source</span></div>
                             {annualSummaries.map((year) => (
                                 <div key={year.taxYear} className="grid gap-2 rounded-lg border p-3 md:grid-cols-4 md:items-center md:border-0 md:p-0">
                                     <span className="font-semibold">{year.taxYear}</span>
                                     <span><span className="mr-2 text-xs text-muted-foreground md:hidden">Income</span>{formatCurrency(year.totalIncome)}</span>
-                                    <span className="text-rose-500"><span className="mr-2 text-xs text-muted-foreground md:hidden">Tax paid</span>{formatCurrency(year.taxPaid)}</span>
+                                    <span className="text-rose-500"><span className="mr-2 text-xs text-muted-foreground md:hidden">Income tax withheld</span>{formatCurrency(year.taxPaid)}</span>
                                     <span className="text-sm text-muted-foreground"><span className="mr-2 text-xs md:hidden">Source</span>{year.source === "tax_return" ? "Tax return" : "Salary records"}</span>
                                 </div>
                             ))}
@@ -222,7 +222,7 @@ export default function TaxesPage() {
                                             <div className="flex flex-wrap items-center gap-2"><h3 className="font-semibold">Tax year {taxReturn.taxYear}</h3><Badge className={statusStyles[taxReturn.status] ?? "bg-muted"}>{taxReturn.status}</Badge></div>
                                             <p className="mt-1 text-sm text-muted-foreground">{taxReturn.country}{taxReturn.filingDate ? ` · Filed ${new Date(taxReturn.filingDate).toLocaleDateString("en-GB")}` : ""}</p>
                                             {taxReturn.notes && <p className="mt-2 truncate text-sm">{taxReturn.notes}</p>}
-                                            <p className="mt-2 text-sm"><span className="text-muted-foreground">Income:</span> {formatCurrency(Number(taxReturn.totalIncome ?? 0))} <span className="ml-3 text-muted-foreground">Tax paid:</span> <span className="text-rose-500">{formatCurrency(Number(taxReturn.taxPaid ?? 0))}</span></p>
+                                            <p className="mt-2 text-sm"><span className="text-muted-foreground">Income:</span> {formatCurrency(Number(taxReturn.totalIncome ?? 0))} <span className="ml-3 text-muted-foreground">Income tax withheld:</span> <span className="text-rose-500">{formatCurrency(Number(taxReturn.taxPaid ?? 0))}</span></p>
                                             {taxReturn.fileName && <p className="mt-2 truncate text-xs text-muted-foreground">{taxReturn.fileName}</p>}
                                         </div>
                                     </div>
@@ -247,7 +247,7 @@ export default function TaxesPage() {
                         </div>
                         <div className="grid gap-4 sm:grid-cols-2">
                             <div className="space-y-2"><Label htmlFor="total-income">Total income</Label><Input id="total-income" type="number" min="0" step="0.01" value={form.totalIncome} onChange={(event) => setForm({ ...form, totalIncome: event.target.value })} required /></div>
-                            <div className="space-y-2"><Label htmlFor="tax-paid">Tax paid</Label><Input id="tax-paid" type="number" min="0" step="0.01" value={form.taxPaid} onChange={(event) => setForm({ ...form, taxPaid: event.target.value })} required /></div>
+                            <div className="space-y-2"><Label htmlFor="tax-paid">Income tax withheld</Label><Input id="tax-paid" type="number" min="0" step="0.01" value={form.taxPaid} onChange={(event) => setForm({ ...form, taxPaid: event.target.value })} required /></div>
                         </div>
                         <div className="grid gap-4 sm:grid-cols-2">
                             <div className="space-y-2"><Label htmlFor="tax-status">Status</Label><select id="tax-status" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as TaxReturnForm["status"] })}><option value="Draft">Draft</option><option value="Filed">Filed</option><option value="Amended">Amended</option></select></div>
