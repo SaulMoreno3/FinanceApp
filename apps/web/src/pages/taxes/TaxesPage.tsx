@@ -105,7 +105,10 @@ export default function TaxesPage() {
 
     const totalIncome = annualSummaries.reduce((sum, year) => sum + year.totalIncome, 0);
     const totalTaxPaid = annualSummaries.reduce((sum, year) => sum + year.taxPaid, 0);
-    const totalNetIncome = totalIncome - totalTaxPaid;
+    const totalNetIncome = annualSummaries.reduce(
+        (sum, year) => sum + year.totalIncome - (year.finalTaxResult ?? year.taxPaid),
+        0,
+    );
 
     const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -199,7 +202,7 @@ export default function TaxesPage() {
                                     <span className="font-semibold">{year.taxYear}</span>
                                     <span><span className="mr-2 text-xs text-muted-foreground md:hidden">Income</span>{formatCurrency(year.totalIncome)}</span>
                                     <span className="text-rose-500"><span className="mr-2 text-xs text-muted-foreground md:hidden">Income tax withheld</span>{formatCurrency(year.taxPaid)}</span>
-                                    <span className="text-sm text-muted-foreground"><span className="mr-2 text-xs md:hidden">Final tax result</span>{formatFinalTaxResult(year.finalTaxResult)}</span>
+                                    <span className={`text-sm ${year.finalTaxResult === null ? "text-muted-foreground" : year.finalTaxResult < 0 ? "text-emerald-500" : "text-rose-500"}`}><span className="mr-2 text-xs text-muted-foreground md:hidden">Final tax result</span>{formatFinalTaxResult(year.finalTaxResult)}</span>
                                 </div>
                             ))}
                         </div>
