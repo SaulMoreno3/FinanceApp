@@ -10,9 +10,11 @@ const upload = createDiskUploader('projects');
 router.get('/', projectsController.list.bind(projectsController));
 router.post('/', projectsController.create.bind(projectsController));
 router.get('/:id', projectsController.get.bind(projectsController));
+router.put('/:id', projectsController.update.bind(projectsController));
 router.delete('/:id', projectsController.delete.bind(projectsController));
 router.post('/:id/entries', upload.single('file'), projectsController.addEntry.bind(projectsController));
 router.get('/:id/entries/:entryId/file', projectsController.entryFile.bind(projectsController));
+router.put('/:id/entries/:entryId', projectsController.updateEntry.bind(projectsController));
 router.delete('/:id/entries/:entryId', projectsController.deleteEntry.bind(projectsController));
 
 export default router;

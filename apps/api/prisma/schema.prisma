@@ -22,6 +22,17 @@ enum ProjectEntryType {
   EXPENSE
 }
 
+enum ProjectStatus {
+  ACTIVE
+  COMPLETED
+  ARCHIVED
+}
+
+enum ProjectPaymentStatus {
+  PENDING
+  PAID
+}
+
 model User {
   id                 String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   email              String              @unique @db.VarChar(255)
@@ -51,6 +62,9 @@ model Project {
   id          String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   name        String
   description String?
+  client      String?
+  budget      Decimal?       @db.Decimal(14, 2)
+  status      ProjectStatus  @default(ACTIVE)
   userId      String         @db.Uuid
   createdAt   DateTime       @default(now()) @db.Timestamptz(6)
   updatedAt   DateTime       @default(now()) @updatedAt @db.Timestamptz(6)
@@ -68,7 +82,12 @@ model ProjectEntry {
   amount         Decimal          @db.Decimal(14, 2)
   description    String
   category       String?
+  counterparty   String?
+  reference      String?
+  notes          String?
+  paymentStatus  ProjectPaymentStatus @default(PAID)
   date           DateTime         @db.Date
+  dueDate        DateTime?        @db.Date
   fileName       String?
   fileStorageKey String?
   fileMimeType   String?
@@ -78,6 +97,7 @@ model ProjectEntry {
 
   @@index([projectId])
   @@index([projectId, date])
+  @@index([projectId, paymentStatus])
   @@map("project_entries")
 }
 

@@ -1,6 +1,6 @@
 import type { Response } from 'express';
 import { projectsService } from './projects.service';
-import { createProjectEntrySchema, createProjectSchema, deleteProjectEntrySchema, projectParamsSchema } from './projects.schema';
+import { createProjectEntrySchema, createProjectSchema, deleteProjectEntrySchema, projectParamsSchema, updateProjectEntrySchema, updateProjectSchema } from './projects.schema';
 import fs from 'fs';
 import path from 'path';
 
@@ -10,9 +10,19 @@ export class ProjectsController {
     }
 
     async create(req: any, res: Response) {
-        const validation = createProjectSchema.safeParse({ body: req.body });
+        const body = { ...req.body, budget: req.body.budget === undefined ? undefined : Number(req.body.budget) };
+        const validation = createProjectSchema.safeParse({ body });
         if (!validation.success) return res.status(400).json({ error: 'Invalid project', details: validation.error.format() });
         res.status(201).json(await projectsService.create(req.user!.id, validation.data.body));
+    }
+
+    async update(req: any, res: Response) {
+        const body = { ...req.body, budget: req.body.budget === undefined ? undefined : Number(req.body.budget) };
+        const validation = updateProjectSchema.safeParse({ params: req.params, body });
+        if (!validation.success) return res.status(400).json({ error: 'Invalid project', details: validation.error.format() });
+        const project = await projectsService.update(req.user!.id, validation.data.params.id, validation.data.body);
+        if (!project) return res.status(404).json({ error: 'Project not found' });
+        res.json(project);
     }
 
     async get(req: any, res: Response) {
@@ -43,6 +53,20 @@ export class ProjectsController {
         const entry = await projectsService.addEntry(req.user!.id, validation.data.params.id, validation.data.body, req.file);
         if (!entry) return res.status(404).json({ error: 'Project not found' });
         res.status(201).json(entry);
+    }
+
+    async updateEntry(req: any, res: Response) {
+        const body = { ...req.body, amount: req.body.amount === undefined ? undefined : Number(req.body.amount) };
+        const validation = updateProjectEntrySchema.safeParse({ params: req.params, body });
+        if (!validation.success) return res.status(400).json({ error: 'Invalid entry', details: validation.error.format() });
+        const project = await projectsService.updateEntry(
+            req.user!.id,
+            validation.data.params.id,
+            validation.data.params.entryId,
+            validation.data.body,
+        );
+        if (!project) return res.status(404).json({ error: 'Entry not found' });
+        res.json(project);
     }
 
     async entryFile(req: any, res: Response) {
