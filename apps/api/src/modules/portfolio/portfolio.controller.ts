@@ -2,8 +2,40 @@ import { Request, Response } from 'express';
 import { portfolioService } from './portfolio.service';
 import { transactionsService } from '../transactions/transactions.service';
 import { StockTrade } from './portfolio.types';
+import { portfolioHistoryService, type PortfolioHistoryRange } from './portfolio-history.service';
+import { marketDataService } from '../market-data/market-data.service';
+
+const HISTORY_RANGES = new Set<PortfolioHistoryRange>(['1D', '1W', '1M', 'YTD', '1Y', 'MAX']);
 
 export class PortfolioController {
+    async getPortfolioHistory(req: any, res: Response) {
+        try {
+            const range = String(req.query.range ?? 'YTD').toUpperCase() as PortfolioHistoryRange;
+            if (!HISTORY_RANGES.has(range)) {
+                return res.status(400).json({ error: 'Unsupported history range' });
+            }
+            const history = await portfolioHistoryService.getHistory(req.user!.id, range);
+            if (!history) {
+                return res.status(404).json({ error: 'Portfolio history has not been generated yet' });
+            }
+            return res.json(history);
+        } catch (error) {
+            console.error('Error loading portfolio history:', error);
+            return res.status(500).json({ error: 'Internal server error' });
+        }
+    }
+
+    async syncPortfolioHistory(req: any, res: Response) {
+        try {
+            const marketData = await marketDataService.syncUserHistory(req.user!.id);
+            const snapshots = await portfolioHistoryService.rebuildUserSnapshots(req.user!.id);
+            return res.json({ ...marketData, ...snapshots });
+        } catch (error) {
+            console.error('Error synchronizing portfolio history:', error);
+            return res.status(500).json({ error: 'Unable to synchronize portfolio history' });
+        }
+    }
+
     async getPortfolioAnalysis(req: any, reqRes: Response) {
         try {
             const { symbol } = req.params;

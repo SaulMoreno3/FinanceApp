@@ -7,6 +7,8 @@ const router = Router();
 router.use(authenticateToken);
 
 router.get('/summary', portfolioController.getPortfolioSummary.bind(portfolioController));
+router.get('/history', portfolioController.getPortfolioHistory.bind(portfolioController));
+router.post('/history/sync', portfolioController.syncPortfolioHistory.bind(portfolioController));
 router.get('/analysis/:symbol', portfolioController.getPortfolioAnalysis.bind(portfolioController));
 
 export default router;
