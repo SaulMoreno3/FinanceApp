@@ -11,7 +11,8 @@ import {
   LineChart,
   Upload,
   Banknote,
-  FolderKanban
+  FolderKanban,
+  ReceiptText
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -28,6 +29,7 @@ export default function MainLayout() {
     { icon: ArrowRightLeft, label: "Transactions", path: "/transactions" },
     { icon: PieChart, label: "Reports", path: "/reports" },
     { icon: Banknote, label: "Salaries", path: "/salary" },
+    { icon: ReceiptText, label: "Taxes", path: "/taxes" },
     { icon: FolderKanban, label: "Projects", path: "/projects" },
     { icon: Upload, label: "Import Data", path: "/import" },
   ];
