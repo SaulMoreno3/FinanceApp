@@ -32,6 +32,7 @@ import {
     PortfolioExposureChart,
     SalaryTrendChart,
 } from "@/components/reports/ReportCharts";
+import { PortfolioPerformanceChart } from "@/components/reports/PortfolioPerformanceChart";
 
 interface Transaction {
     id: string;
@@ -346,6 +347,10 @@ export default function ReportsPage() {
                         icon={Banknote}
                         tone="amber"
                     />
+                </section>
+
+                <section>
+                    <PortfolioPerformanceChart />
                 </section>
 
                 <section className="grid gap-6 xl:grid-cols-2">
