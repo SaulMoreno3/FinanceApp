@@ -14,6 +14,15 @@ export class TaxesController {
         }
     }
 
+    async summary(req: any, res: Response) {
+        try {
+            res.json({ data: await taxesService.summary(req.user!.id) });
+        } catch (error) {
+            console.error(error);
+            res.status(500).json({ error: 'Internal Server Error' });
+        }
+    }
+
     async create(req: any, res: Response) {
         try {
             const validation = taxReturnSchema.safeParse({
