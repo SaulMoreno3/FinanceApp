@@ -26,6 +26,7 @@ interface AnnualSummary {
     taxYear: number;
     totalIncome: number;
     taxPaid: number;
+    finalTaxResult: number | null;
     source: "tax_return" | "salary_records";
 }
 
@@ -60,6 +61,11 @@ const formatCurrency = (value: number) => new Intl.NumberFormat("en-GB", {
     currency: "EUR",
     maximumFractionDigits: 2,
 }).format(value);
+
+const formatFinalTaxResult = (value: number | null) => {
+    if (value === null) return "Not filed";
+    return value < 0 ? `Refund ${formatCurrency(Math.abs(value))}` : `Due ${formatCurrency(value)}`;
+};
 
 export default function TaxesPage() {
     const [taxReturns, setTaxReturns] = useState<TaxReturn[]>([]);
@@ -187,13 +193,13 @@ export default function TaxesPage() {
                         <p className="py-8 text-center text-sm text-muted-foreground">Add a tax return to see annual income and income tax withheld.</p>
                     ) : (
                         <div className="space-y-3">
-                            <div className="hidden grid-cols-4 gap-4 border-b pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground md:grid"><span>Tax year</span><span>Income</span><span>Income tax withheld</span><span>Source</span></div>
+                            <div className="hidden grid-cols-4 gap-4 border-b pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground md:grid"><span>Tax year</span><span>Income</span><span>Income tax withheld</span><span>Final tax result</span></div>
                             {annualSummaries.map((year) => (
                                 <div key={year.taxYear} className="grid gap-2 rounded-lg border p-3 md:grid-cols-4 md:items-center md:border-0 md:p-0">
                                     <span className="font-semibold">{year.taxYear}</span>
                                     <span><span className="mr-2 text-xs text-muted-foreground md:hidden">Income</span>{formatCurrency(year.totalIncome)}</span>
                                     <span className="text-rose-500"><span className="mr-2 text-xs text-muted-foreground md:hidden">Income tax withheld</span>{formatCurrency(year.taxPaid)}</span>
-                                    <span className="text-sm text-muted-foreground"><span className="mr-2 text-xs md:hidden">Source</span>{year.source === "tax_return" ? "Tax return" : "Salary records"}</span>
+                                    <span className="text-sm text-muted-foreground"><span className="mr-2 text-xs md:hidden">Final tax result</span>{formatFinalTaxResult(year.finalTaxResult)}</span>
                                 </div>
                             ))}
                         </div>

@@ -240,6 +240,7 @@ model TaxReturn {
   status         String   @default("Draft") @db.VarChar(32)
   totalIncome    Decimal  @default(0) @db.Decimal(14, 2)
   taxPaid       Decimal  @default(0) @db.Decimal(14, 2)
+  finalTaxResult Decimal? @map("final_tax_result") @db.Decimal(14, 2)
   filingDate     DateTime? @db.Date
   notes          String?
   fileName       String?

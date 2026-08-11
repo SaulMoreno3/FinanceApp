@@ -18,7 +18,7 @@ export class TaxesService {
         const [taxReturns, salaries] = await Promise.all([
             prisma.taxReturn.findMany({
                 where: { userId },
-                select: { taxYear: true, totalIncome: true, taxPaid: true },
+                select: { taxYear: true, totalIncome: true, taxPaid: true, finalTaxResult: true },
             }),
             prisma.salaryRecord.findMany({
                 where: { userId },
@@ -42,11 +42,12 @@ export class TaxesService {
             salaryByYear.set(taxYear, current);
         }
 
-        const declaredByYear = new Map<number, { totalIncome: number; taxPaid: number }>();
+        const declaredByYear = new Map<number, { totalIncome: number; taxPaid: number; finalTaxResult: number | null }>();
         for (const taxReturn of taxReturns) {
-            const current = declaredByYear.get(taxReturn.taxYear) ?? { totalIncome: 0, taxPaid: 0 };
+            const current = declaredByYear.get(taxReturn.taxYear) ?? { totalIncome: 0, taxPaid: 0, finalTaxResult: null };
             current.totalIncome += Number(taxReturn.totalIncome);
             current.taxPaid += Number(taxReturn.taxPaid);
+            if (taxReturn.finalTaxResult !== null) current.finalTaxResult = Number(taxReturn.finalTaxResult);
             declaredByYear.set(taxReturn.taxYear, current);
         }
 
@@ -56,7 +57,7 @@ export class TaxesService {
             .map((taxYear) => {
                 const declared = declaredByYear.get(taxYear);
                 const hasDeclaredAmounts = Boolean(declared && (declared.totalIncome > 0 || declared.taxPaid > 0));
-                const values = hasDeclaredAmounts ? declared! : (salaryByYear.get(taxYear) ?? { totalIncome: 0, taxPaid: 0 });
+                const values = hasDeclaredAmounts ? declared! : { ...(salaryByYear.get(taxYear) ?? { totalIncome: 0, taxPaid: 0 }), finalTaxResult: null };
                 return { taxYear, ...values, source: hasDeclaredAmounts ? 'tax_return' : 'salary_records' };
             });
     }
