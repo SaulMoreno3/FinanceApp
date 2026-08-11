@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { Eye, FileText, Loader2, Plus, Trash2, Upload } from "lucide-react";
 import { fetchAPI, fetchBlob, postAPI } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
@@ -103,9 +103,9 @@ export default function TaxesPage() {
         if (viewer?.url) URL.revokeObjectURL(viewer.url);
     }, [viewer]);
 
-    const latestYear = useMemo(() => taxReturns[0]?.taxYear ?? null, [taxReturns]);
     const totalIncome = annualSummaries.reduce((sum, year) => sum + year.totalIncome, 0);
     const totalTaxPaid = annualSummaries.reduce((sum, year) => sum + year.taxPaid, 0);
+    const totalNetIncome = totalIncome - totalTaxPaid;
 
     const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -181,8 +181,8 @@ export default function TaxesPage() {
                     <CardContent><p className="text-2xl font-bold text-rose-500">{formatCurrency(totalTaxPaid)}</p><p className="text-xs text-muted-foreground">Across all tax years</p></CardContent>
                 </Card>
                 <Card>
-                    <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Latest tax year</CardTitle></CardHeader>
-                    <CardContent><p className="text-2xl font-bold">{latestYear ?? "—"}</p><p className="text-xs text-muted-foreground">{taxReturns.length} saved filings</p></CardContent>
+                    <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Total net income</CardTitle></CardHeader>
+                    <CardContent><p className="text-2xl font-bold">{formatCurrency(totalNetIncome)}</p><p className="text-xs text-muted-foreground">After income tax withheld</p></CardContent>
                 </Card>
             </div>
 
