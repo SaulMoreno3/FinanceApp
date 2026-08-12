@@ -211,12 +211,6 @@ export default function SalaryDetailModal({ salaryId, onClose }: SalaryDetailMod
                 </div>
             </div>
 
-            {data.notes && (
-                <div className="text-sm bg-yellow-50 dark:bg-yellow-900/10 p-3 rounded-md text-yellow-800 dark:text-yellow-200 border border-yellow-100 dark:border-yellow-900/20">
-                    <p className="text-xs font-bold uppercase opacity-50 mb-1">Notes</p>
-                    {data.notes}
-                </div>
-            )}
         </div>
     );
 
