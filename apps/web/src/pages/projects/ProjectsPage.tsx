@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-    ArrowDownLeft, ArrowUpRight, BriefcaseBusiness, CalendarClock, CheckCircle2, CircleDollarSign,
-    Download, Edit3, FileText, FolderKanban, MoreHorizontal, Plus, ReceiptText, Search, Trash2, TrendingUp, WalletCards,
+    ArrowDownLeft, ArrowUpRight, CalendarClock, CheckCircle2, CircleDollarSign,
+    Download, Edit3, FileText, FolderKanban, MoreHorizontal, ReceiptText, Search, Trash2, TrendingUp, WalletCards,
 } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Badge } from '@/components/ui/badge';
@@ -199,14 +199,6 @@ export default function ProjectsPage() {
     return (
         <div className="min-h-full bg-muted/20 p-4 md:p-6">
             <div className="mx-auto max-w-[1500px] space-y-6">
-                <div className="relative overflow-hidden rounded-2xl border bg-card px-5 py-6 shadow-sm md:px-8">
-                    <div className="absolute -right-20 -top-24 h-64 w-64 rounded-full bg-primary/10 blur-3xl" />
-                    <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex items-center gap-4"><div className="rounded-2xl bg-primary p-3 text-primary-foreground shadow-lg shadow-primary/20"><BriefcaseBusiness className="h-6 w-6" /></div><div><h1 className="text-2xl font-bold tracking-tight md:text-3xl">Project accounts</h1><p className="mt-1 text-sm text-muted-foreground">A clear financial ledger for every project or company.</p></div></div>
-                        <Button onClick={() => { setEditingProject(false); setProjectDialogOpen(true); }}><Plus className="mr-2 h-4 w-4" />New project</Button>
-                    </div>
-                </div>
-
                 {error && <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
 
                 <div className="grid items-start gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">
