@@ -65,21 +65,21 @@ export default function SalaryCalendar({ refreshTrigger }: SalaryCalendarProps) 
             <CardHeader>
                 <CardTitle>Monthly net income</CardTitle>
             </CardHeader>
-            <CardContent className="overflow-x-auto">
-                <Table className="min-w-[980px]">
+            <CardContent className="overflow-x-auto px-3 sm:px-4">
+                <Table className="w-full min-w-[980px] table-fixed text-xs md:min-w-0">
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Year</TableHead>
-                            {MONTHS.map((month) => <TableHead key={month} className="text-right">{month}</TableHead>)}
-                            <TableHead className="text-right">Total</TableHead>
+                            <TableHead className="w-12 px-1 sm:px-2">Year</TableHead>
+                            {MONTHS.map((month) => <TableHead key={month} className="px-1 text-right sm:px-2">{month}</TableHead>)}
+                            <TableHead className="w-20 px-1 text-right sm:px-2">Total</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {summaries.map((summary) => (
                             <TableRow key={summary.year}>
-                                <TableCell className="font-semibold">{summary.year}</TableCell>
-                                {summary.months.map((amount, month) => <TableCell key={month} className="whitespace-nowrap text-right text-muted-foreground">{amount ? formatEuro(amount) : "—"}</TableCell>)}
-                                <TableCell className="whitespace-nowrap text-right font-semibold">{formatEuro(summary.total)}</TableCell>
+                                <TableCell className="px-1 font-semibold sm:px-2">{summary.year}</TableCell>
+                                {summary.months.map((amount, month) => <TableCell key={month} className="whitespace-nowrap px-1 text-right text-muted-foreground sm:px-2">{amount ? formatEuro(amount) : "—"}</TableCell>)}
+                                <TableCell className="whitespace-nowrap px-1 text-right font-semibold sm:px-2">{formatEuro(summary.total)}</TableCell>
                             </TableRow>
                         ))}
                         {summaries.length === 0 && <TableRow><TableCell colSpan={14} className="py-8 text-center text-muted-foreground">No salary records found.</TableCell></TableRow>}
