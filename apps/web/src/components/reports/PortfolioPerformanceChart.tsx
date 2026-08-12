@@ -345,7 +345,13 @@ export function PortfolioPerformanceChart() {
                                 <ReferenceLine y={baseline} stroke="#a1a1aa" strokeDasharray="2 5" strokeOpacity={0.48} />
                                 {comparison && (
                                     <>
-                                        <ReferenceArea x1={comparison.first.date} x2={comparison.last.date} fill={lineColor} fillOpacity={0.07} strokeOpacity={0} />
+                                        <ReferenceArea
+                                            x1={comparison.first.date}
+                                            x2={comparison.last.date}
+                                            fill={lineColor}
+                                            fillOpacity={0.07}
+                                            stroke="none"
+                                        />
                                         <ReferenceLine x={comparison.first.date} stroke="#d4d4d8" strokeDasharray="3 5" strokeOpacity={0.65} />
                                         <ReferenceLine x={comparison.last.date} stroke="#d4d4d8" strokeDasharray="3 5" strokeOpacity={0.65} />
                                         <ReferenceDot x={comparison.first.date} y={comparison.first.chartValue} r={4.5} fill="#18181b" stroke={lineColor} strokeWidth={2.5} />
