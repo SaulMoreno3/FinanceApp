@@ -122,38 +122,34 @@ export function PortfolioTable({ holdings, prices }: PortfolioTableProps) {
 
 export function ClosedPositionsTable({ holdings }: { holdings: Holding[] }) {
     return (
-        <div className="rounded-md border overflow-x-auto">
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                        <TableHead>Asset</TableHead>
-                        <TableHead className="text-right">Realized Profit</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {holdings.map((holding) => {
-                        const currencySymbol = holding.currency === 'USD' ? '$' : '€';
-                        const gain = holding.realizedGain;
+        <div className="overflow-hidden rounded-md border">
+            <div className="grid grid-cols-1 border-b bg-muted/20 text-sm font-medium text-muted-foreground lg:grid-cols-2">
+                <div className="px-5 py-3">Asset</div>
+                <div className="hidden px-5 py-3 text-right lg:block">Realized Profit</div>
+            </div>
+            <div className="grid grid-cols-1 lg:grid-cols-2">
+                {holdings.map((holding) => {
+                    const currencySymbol = holding.currency === 'USD' ? '$' : '€';
+                    const gain = holding.realizedGain;
 
-                        return (
-                            <TableRow key={holding.symbol}>
-                                <TableCell className="font-medium">
-                                    <Link to={`/portfolio/${holding.symbol}`} className="hover:underline text-blue-500">
-                                        {holding.name || holding.symbol}
-                                    </Link>
-                                    <div className="text-xs text-muted-foreground">
-                                        {holding.symbol}
-                                        {holding.isin ? ` · ISIN ${holding.isin}` : ''}
-                                    </div>
-                                </TableCell>
-                                <TableCell className={`text-right font-medium ${gain >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                                    {gain >= 0 ? '+' : ''}{currencySymbol}{gain.toFixed(2)}
-                                </TableCell>
-                            </TableRow>
-                        );
-                    })}
-                </TableBody>
-            </Table>
+                    return (
+                        <div key={holding.symbol} className="flex items-center justify-between gap-4 border-b px-5 py-4 transition-colors hover:bg-muted/20 lg:min-h-[88px] lg:even:border-l">
+                            <div className="min-w-0">
+                                <Link to={`/portfolio/${holding.symbol}`} className="font-medium text-blue-500 hover:underline">
+                                    {holding.name || holding.symbol}
+                                </Link>
+                                <div className="text-xs text-muted-foreground">
+                                    {holding.symbol}
+                                    {holding.isin ? ` · ISIN ${holding.isin}` : ''}
+                                </div>
+                            </div>
+                            <div className={`shrink-0 text-right font-medium ${gain >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                {gain >= 0 ? '+' : ''}{currencySymbol}{gain.toFixed(2)}
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
         </div>
     );
 }
