@@ -332,6 +332,7 @@ export class PortfolioHistoryService {
             return {
                 date: dayKey(point.date),
                 marketValue: Number(point.marketValue),
+                investedCapital: Number(point.costBasis),
                 performanceValue: Number(first.marketValue) + cumulativePnl,
                 performancePercent: baselineValue > 0 ? (cumulativePnl / baselineValue) * 100 : 0,
                 dailyPnl: Number(point.dailyPnl),
