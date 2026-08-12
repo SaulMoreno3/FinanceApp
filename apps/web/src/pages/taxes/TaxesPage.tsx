@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import TaxEstimator from "./TaxEstimator";
+import { estimateAragonIrpf } from "./tax-estimator";
 
 interface TaxReturn {
     id: string;
@@ -194,8 +194,6 @@ export default function TaxesPage() {
                 </Card>
             </div>
 
-            <TaxEstimator annualSummaries={annualSummaries} />
-
             <Card>
                 <CardHeader><CardTitle>Annual tax overview</CardTitle></CardHeader>
                 <CardContent>
@@ -203,13 +201,14 @@ export default function TaxesPage() {
                         <p className="py-8 text-center text-sm text-muted-foreground">Add a tax return to see annual income and income tax withheld.</p>
                     ) : (
                         <div className="space-y-3">
-                            <div className="hidden grid-cols-4 gap-4 border-b pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground md:grid"><span>Tax year</span><span>Income</span><span>Income tax withheld</span><span>Final tax result</span></div>
+                            <div className="hidden grid-cols-5 gap-4 border-b pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground md:grid"><span>Tax year</span><span>Income</span><span>Income tax withheld</span><span>Final tax result</span><span>Estimated result</span></div>
                             {annualSummaries.map((year) => (
-                                <div key={year.taxYear} className="grid gap-2 rounded-lg border p-3 md:grid-cols-4 md:items-center md:border-0 md:p-0">
+                                <div key={year.taxYear} className="grid gap-2 rounded-lg border p-3 md:grid-cols-5 md:items-center md:border-0 md:p-0">
                                     <span className="font-semibold">{year.taxYear}</span>
                                     <span><span className="mr-2 text-xs text-muted-foreground md:hidden">Income</span>{formatCurrency(year.totalIncome)}</span>
                                     <span className="text-rose-500"><span className="mr-2 text-xs text-muted-foreground md:hidden">Income tax withheld</span>{formatCurrency(year.taxPaid)}</span>
                                     <span className={`text-sm ${year.finalTaxResult === null ? "text-muted-foreground" : year.finalTaxResult < 0 ? "text-emerald-500" : "text-rose-500"}`}><span className="mr-2 text-xs text-muted-foreground md:hidden">Final tax result</span>{formatFinalTaxResult(year.finalTaxResult)}</span>
+                                    <EstimatedResult income={year.totalIncome} taxPaid={year.taxPaid} />
                                 </div>
                             ))}
                         </div>
@@ -284,4 +283,20 @@ export default function TaxesPage() {
             </Dialog>
         </div>
     );
+}
+
+function EstimatedResult({ income, taxPaid }: { income: number; taxPaid: number }) {
+    const estimate = estimateAragonIrpf({
+        employmentGross: income,
+        selfEmploymentProfit: 0,
+        savingsIncome: 0,
+        capitalGains: 0,
+        socialSecurity: 0,
+        workExpenses: 0,
+        personalDeductions: 0,
+        withholdings: taxPaid,
+        advancePayments: 0,
+    });
+    const isDue = estimate.result >= 0;
+    return <span className={isDue ? "text-rose-500" : "text-emerald-500"}><span className="mr-2 text-xs text-muted-foreground md:hidden">Estimated result</span>{isDue ? `To pay ${formatCurrency(estimate.result)}` : `Refund ${formatCurrency(Math.abs(estimate.result))}`}</span>;
 }
