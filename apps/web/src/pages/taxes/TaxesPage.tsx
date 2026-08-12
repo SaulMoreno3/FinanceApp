@@ -28,7 +28,13 @@ interface AnnualSummary {
     totalIncome: number;
     taxPaid: number;
     finalTaxResult: number | null;
-    source: "tax_return" | "salary_records";
+    source: "tax_return" | "operational_records";
+    employmentIncome: number;
+    selfEmploymentIncome: number;
+    savingsIncome: number;
+    capitalGains: number;
+    socialSecurity: number;
+    workExpenses: number;
 }
 
 interface TaxReturnForm {
@@ -208,7 +214,7 @@ export default function TaxesPage() {
                                     <span><span className="mr-2 text-xs text-muted-foreground md:hidden">Income</span>{formatCurrency(year.totalIncome)}</span>
                                     <span className="text-rose-500"><span className="mr-2 text-xs text-muted-foreground md:hidden">Income tax withheld</span>{formatCurrency(year.taxPaid)}</span>
                                     <span className={`text-sm ${year.finalTaxResult === null ? "text-muted-foreground" : year.finalTaxResult < 0 ? "text-emerald-500" : "text-rose-500"}`}><span className="mr-2 text-xs text-muted-foreground md:hidden">Final tax result</span>{formatFinalTaxResult(year.finalTaxResult)}</span>
-                                    <EstimatedResult income={year.totalIncome} taxPaid={year.taxPaid} />
+                                    <EstimatedResult year={year} />
                                 </div>
                             ))}
                         </div>
@@ -285,16 +291,16 @@ export default function TaxesPage() {
     );
 }
 
-function EstimatedResult({ income, taxPaid }: { income: number; taxPaid: number }) {
+function EstimatedResult({ year }: { year: AnnualSummary }) {
     const estimate = estimateAragonIrpf({
-        employmentGross: income,
-        selfEmploymentProfit: 0,
-        savingsIncome: 0,
-        capitalGains: 0,
-        socialSecurity: 0,
-        workExpenses: 0,
+        employmentGross: year.employmentIncome,
+        selfEmploymentProfit: year.selfEmploymentIncome,
+        savingsIncome: year.savingsIncome,
+        capitalGains: year.capitalGains,
+        socialSecurity: year.socialSecurity,
+        workExpenses: year.workExpenses,
         personalDeductions: 0,
-        withholdings: taxPaid,
+        withholdings: year.taxPaid,
         advancePayments: 0,
     });
     const isDue = estimate.result > 0;
