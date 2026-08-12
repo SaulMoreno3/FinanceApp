@@ -14,6 +14,7 @@ type ChartMode = "VALUE" | "PERCENT";
 type HistoryPoint = {
     date: string;
     marketValue: number;
+    investedCapital: number;
     performanceValue: number;
     performancePercent: number;
     dailyPnl: number;
@@ -85,6 +86,10 @@ function PerformanceTooltip({ active, payload, mode }: {
             <div className="mt-2 flex items-center justify-between gap-4 text-[11px] text-muted-foreground">
                 <span>Market value</span>
                 <span className="tabular-nums">{currency.format(point.marketValue)}</span>
+            </div>
+            <div className="mt-1 flex items-center justify-between gap-4 text-[11px] text-muted-foreground">
+                <span>Invested capital</span>
+                <span className="tabular-nums">{currency.format(Number(point.investedCapital ?? 0))}</span>
             </div>
         </div>
     );
