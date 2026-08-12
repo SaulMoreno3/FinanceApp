@@ -66,11 +66,7 @@ export default function SalaryPage() {
                 </div>
             </div>
 
-            <SalaryList
-                refreshTrigger={refreshTrigger}
-                onView={setViewingId}
-                onEdit={handleEdit}
-            />
+            <SalaryList refreshTrigger={refreshTrigger} />
 
             {/* Create/Edit Modal */}
             <Dialog open={isCreateOpen} onOpenChange={(open) => {
@@ -107,7 +103,7 @@ export default function SalaryPage() {
                             Review your records and monthly income totals by year.
                         </DialogDescription>
                     </DialogHeader>
-                    <SalaryHistory refreshTrigger={refreshTrigger} onView={setViewingId} />
+                    <SalaryHistory refreshTrigger={refreshTrigger} onView={setViewingId} onEdit={handleEdit} />
                 </DialogContent>
             </Dialog>
         </div>

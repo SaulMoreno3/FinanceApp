@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
 import { AlertCircle, FileText } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 import { fetchAPI } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
     Table,
@@ -21,6 +23,7 @@ const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "
 interface SalaryHistoryProps {
     refreshTrigger: number;
     onView: (id: string) => void;
+    onEdit: (salary: SalaryRecord) => void;
 }
 
 interface YearSummary {
@@ -29,7 +32,7 @@ interface YearSummary {
     total: number;
 }
 
-export default function SalaryHistory({ refreshTrigger, onView }: SalaryHistoryProps) {
+export default function SalaryHistory({ refreshTrigger, onView, onEdit }: SalaryHistoryProps) {
     const [salaries, setSalaries] = useState<SalaryRecord[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(false);
@@ -39,7 +42,7 @@ export default function SalaryHistory({ refreshTrigger, onView }: SalaryHistoryP
         // eslint-disable-next-line react-hooks/set-state-in-effect -- synchronize remote loading state
         setLoading(true);
         setError(false);
-        fetchAPI<SalaryListResponse>("/salary?limit=1000")
+        fetchAPI<SalaryListResponse>("/salary?limit=100")
             .then((response) => {
                 if (active) setSalaries(response.data);
             })
@@ -54,6 +57,16 @@ export default function SalaryHistory({ refreshTrigger, onView }: SalaryHistoryP
             active = false;
         };
     }, [refreshTrigger]);
+
+    const handleDelete = async (id: string) => {
+        if (!confirm("Are you sure you want to delete this salary record?")) return;
+        try {
+            await fetchAPI<void>(`/salary/${id}`, { method: "DELETE" });
+            setSalaries((current) => current.filter((salary) => salary.id !== id));
+        } catch (deleteError) {
+            console.error(deleteError);
+        }
+    };
 
     const summaries = useMemo<YearSummary[]>(() => {
         const byYear = new Map<number, YearSummary>();
@@ -131,6 +144,7 @@ export default function SalaryHistory({ refreshTrigger, onView }: SalaryHistoryP
                                 <TableHead className="text-right">Gross</TableHead>
                                 <TableHead className="text-right">Net</TableHead>
                                 <TableHead>File</TableHead>
+                                <TableHead className="text-right pr-6">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -143,10 +157,20 @@ export default function SalaryHistory({ refreshTrigger, onView }: SalaryHistoryP
                                     <TableCell>
                                         {salary.fileName ? <Badge variant="outline" className="gap-1 font-normal"><FileText className="h-3 w-3" />PDF</Badge> : <span className="text-xs italic text-muted-foreground">No file</span>}
                                     </TableCell>
+                                    <TableCell className="pr-6 text-right">
+                                        <div className="flex justify-end gap-1" onClick={(event) => event.stopPropagation()}>
+                                            <Button variant="ghost" size="icon" onClick={() => onEdit(salary)} aria-label="Edit salary record">
+                                                <Pencil className="h-4 w-4 text-muted-foreground" />
+                                            </Button>
+                                            <Button variant="ghost" size="icon" className="text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => handleDelete(salary.id)} aria-label="Delete salary record">
+                                                <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                        </div>
+                                    </TableCell>
                                 </TableRow>
                             ))}
                             {salaries.length === 0 && (
-                                <TableRow><TableCell colSpan={5} className="py-8 text-center text-muted-foreground">No salary records found.</TableCell></TableRow>
+                                <TableRow><TableCell colSpan={6} className="py-8 text-center text-muted-foreground">No salary records found.</TableCell></TableRow>
                             )}
                         </TableBody>
                     </Table>

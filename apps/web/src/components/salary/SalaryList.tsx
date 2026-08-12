@@ -1,30 +1,17 @@
 import { useEffect, useState } from "react";
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow
-} from "@/components/ui/table";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Trash2, FileText, TrendingUp, DollarSign, Calendar, Pencil } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { TrendingUp, DollarSign, Calendar } from "lucide-react";
 import type { SalaryRecord, SalaryListResponse } from "./salary.types";
 import { fetchAPI } from "@/lib/api";
 import { format } from "date-fns";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { TableSkeleton } from "@/components/common/TableSkeleton";
 import { formatEuro } from "./salary.format";
 
 interface SalaryListProps {
     refreshTrigger: number;
-    onView: (id: string) => void;
-    onEdit: (salary: SalaryRecord) => void;
 }
 
-export default function SalaryList({ refreshTrigger, onView, onEdit }: SalaryListProps) {
+export default function SalaryList({ refreshTrigger }: SalaryListProps) {
     const [salaries, setSalaries] = useState<SalaryRecord[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -45,17 +32,6 @@ export default function SalaryList({ refreshTrigger, onView, onEdit }: SalaryLis
         fetchSalaries();
     }, [refreshTrigger]);
 
-    const handleDelete = async (id: string) => {
-        if (!confirm("Are you sure you want to delete this salary record?")) return;
-        try {
-            await fetchAPI<void>(`/salary/${id}`, { method: 'DELETE' });
-            fetchSalaries();
-        } catch (error) {
-            console.error(error);
-            alert("Failed to delete record");
-        }
-    };
-
     // Calculate stats
     const totalNet = salaries.reduce((acc, curr) => acc + Number(curr.netSalary || 0), 0);
     const averageNet = salaries.length > 0 ? totalNet / salaries.length : 0;
@@ -65,17 +41,6 @@ export default function SalaryList({ refreshTrigger, onView, onEdit }: SalaryLis
         return (
             <div className="space-y-6">
                 <SalaryStatsSkeleton />
-                <Card>
-                    <CardHeader>
-                        <CardTitle>History</CardTitle>
-                        <CardDescription>
-                            A list of all your uploaded payrolls and invoices.
-                        </CardDescription>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                        <TableSkeleton columns={6} rows={5} withHeader={true} />
-                    </CardContent>
-                </Card>
             </div>
         );
     }
@@ -118,87 +83,6 @@ export default function SalaryList({ refreshTrigger, onView, onEdit }: SalaryLis
                 </Card>
             </div>
 
-            {/* List Card */}
-            <Card>
-                <CardHeader>
-                    <CardTitle>History</CardTitle>
-                    <CardDescription>
-                        A list of all your uploaded payrolls and invoices.
-                    </CardDescription>
-                </CardHeader>
-                <CardContent className="p-0">
-                    <Table>
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead className="pl-6">Date</TableHead>
-                                <TableHead>Company</TableHead>
-                                <TableHead className="text-right">Gross</TableHead>
-                                <TableHead className="text-right">Net</TableHead>
-                                <TableHead>File</TableHead>
-                                <TableHead className="text-right pr-6">Actions</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {salaries.map((salary) => (
-                                <TableRow key={salary.id} className="group cursor-pointer hover:bg-muted/50 transition-colors" onClick={() => onView(salary.id)}>
-                                    <TableCell className="pl-6 font-medium">
-                                        {format(new Date(salary.date), "MMM yyyy")}
-                                    </TableCell>
-                                    <TableCell>
-                                        <span className="font-semibold text-foreground/80">{salary.company || "Unknown"}</span>
-                                    </TableCell>
-                                    <TableCell className="text-right text-muted-foreground">
-                                        {salary.grossSalary != null ? formatEuro(salary.grossSalary) : "-"}
-                                    </TableCell>
-                                    <TableCell className="text-right font-bold text-emerald-600 dark:text-emerald-500">
-                                        {salary.netSalary != null ? formatEuro(salary.netSalary) : "-"}
-                                    </TableCell>
-                                    <TableCell>
-                                        {salary.fileName ? (
-                                            <Badge variant="outline" className="gap-1 font-normal">
-                                                <FileText className="w-3 h-3" />
-                                                PDF
-                                            </Badge>
-                                        ) : (
-                                            <span className="text-muted-foreground text-xs italic">No file</span>
-                                        )}
-                                    </TableCell>
-                                    <TableCell className="text-right pr-6">
-                                        <div className="flex justify-end gap-1" onClick={e => e.stopPropagation()}>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                onClick={() => onEdit(salary)}
-                                            >
-                                                <Pencil className="w-4 h-4 text-muted-foreground" />
-                                            </Button>
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                                                onClick={() => handleDelete(salary.id)}
-                                            >
-                                                <Trash2 className="w-4 h-4" />
-                                            </Button>
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-                            ))}
-                            {salaries.length === 0 && (
-                                <TableRow>
-                                    <TableCell colSpan={6} className="text-center py-12 text-muted-foreground">
-                                        <div className="flex flex-col items-center gap-2">
-                                            <FileText className="w-10 h-10 opacity-20" />
-                                            <p>No salary records found.</p>
-                                            <p className="text-xs">Upload your first payroll to get started.</p>
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
         </div>
     );
 }
