@@ -292,15 +292,16 @@ export default function TaxesPage() {
 }
 
 function EstimatedResult({ year }: { year: AnnualSummary }) {
+    const hasOperationalCategories = Object.prototype.hasOwnProperty.call(year, "employmentIncome");
     const estimate = estimateAragonIrpf({
-        employmentGross: year.employmentIncome,
-        selfEmploymentProfit: year.selfEmploymentIncome,
-        savingsIncome: year.savingsIncome,
-        capitalGains: year.capitalGains,
-        socialSecurity: year.socialSecurity,
-        workExpenses: year.workExpenses,
+        employmentGross: Number(hasOperationalCategories ? year.employmentIncome : year.totalIncome) || 0,
+        selfEmploymentProfit: Number(hasOperationalCategories ? year.selfEmploymentIncome : 0),
+        savingsIncome: Number(hasOperationalCategories ? year.savingsIncome : 0),
+        capitalGains: Number(hasOperationalCategories ? year.capitalGains : 0),
+        socialSecurity: Number(hasOperationalCategories ? year.socialSecurity : 0),
+        workExpenses: Number(hasOperationalCategories ? year.workExpenses : 0),
         personalDeductions: 0,
-        withholdings: year.taxPaid,
+        withholdings: Number(year.taxPaid ?? 0),
         advancePayments: 0,
     });
     const isDue = estimate.result > 0;
