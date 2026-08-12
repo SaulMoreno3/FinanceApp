@@ -6,8 +6,6 @@ import {
     Banknote,
     BriefcaseBusiness,
     CircleDollarSign,
-    RefreshCw,
-    Sparkles,
     TrendingUp,
     Wallet,
 } from "lucide-react";
@@ -287,29 +285,6 @@ export default function ReportsPage() {
             <div className="pointer-events-none absolute -left-32 top-[36rem] h-80 w-80 rounded-full bg-blue-500/[0.05] blur-3xl" />
 
             <div className="relative space-y-6 p-5 md:p-8">
-                <section className="relative overflow-hidden rounded-3xl border border-border/70 bg-gradient-to-br from-card via-card to-primary/[0.09] px-6 py-7 shadow-xl shadow-black/[0.04] md:px-8 md:py-9">
-                    <div className="pointer-events-none absolute -right-16 -top-28 h-72 w-72 rounded-full border border-primary/10 bg-primary/[0.06]" />
-                    <div className="pointer-events-none absolute -right-2 top-8 h-40 w-40 rounded-full border border-primary/10" />
-                    <div className="relative flex flex-col gap-6 sm:flex-row sm:items-end sm:justify-between">
-                        <div className="max-w-2xl">
-                            <Badge variant="outline" className="mb-4 gap-1.5 border-primary/20 bg-primary/10 px-3 py-1 text-primary">
-                                <Sparkles className="h-3.5 w-3.5" /> Financial overview
-                            </Badge>
-                            <h1 className="text-3xl font-bold tracking-[-0.03em] md:text-4xl">Your financial command centre</h1>
-                            <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground md:text-base">
-                                A clear view of your wealth, portfolio exposure and income performance — all in one place.
-                            </p>
-                        </div>
-                        <div className="flex flex-col items-start gap-2 sm:items-end">
-                            <Button variant="outline" className="border-border/80 bg-background/60 shadow-sm backdrop-blur" onClick={loadReports} disabled={isLoading}>
-                                <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
-                                Refresh data
-                            </Button>
-                            <span className="text-[11px] text-muted-foreground">Live data · FIFO portfolio method</span>
-                        </div>
-                    </div>
-                </section>
-
                 {Object.keys(sectionErrors).length > 0 && (
                     <div className="flex items-center gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
                         <Activity className="h-4 w-4 shrink-0" />
