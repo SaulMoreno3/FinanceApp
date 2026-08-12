@@ -15,6 +15,7 @@ const PortfolioAnalysisPage = lazy(() => import("@/pages/portfolio/PortfolioAnal
 const ImportPage = lazy(() => import("@/pages/import-data/ImportPage"));
 const NetWorthPage = lazy(() => import("@/pages/net-worth/NetWorthPage"));
 const SalaryPage = lazy(() => import("@/pages/salary/SalaryPage"));
+const SalaryHistoryPage = lazy(() => import("@/pages/salary/SalaryHistoryPage"));
 const ReportsPage = lazy(() => import("@/pages/reports/ReportsPage"));
 const ProjectsPage = lazy(() => import("@/pages/projects/ProjectsPage"));
 const AccountSettingsPage = lazy(() => import("@/pages/settings/AccountSettingsPage"));
@@ -66,7 +67,10 @@ const router = createBrowserRouter([
               },
               {
                 path: "salary",
-                element: deferred(<SalaryPage />),
+                children: [
+                  { path: "", element: deferred(<SalaryPage />) },
+                  { path: "history", element: deferred(<SalaryHistoryPage />) },
+                ],
               },
               {
                 path: "taxes",

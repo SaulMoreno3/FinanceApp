@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { AlertCircle, FileText } from "lucide-react";
 import { Pencil, Trash2 } from "lucide-react";
@@ -18,18 +18,10 @@ import { TableSkeleton } from "@/components/common/TableSkeleton";
 import type { SalaryListResponse, SalaryRecord } from "./salary.types";
 import { formatEuro } from "./salary.format";
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
 interface SalaryHistoryProps {
     refreshTrigger: number;
     onView: (id: string) => void;
     onEdit: (salary: SalaryRecord) => void;
-}
-
-interface YearSummary {
-    year: number;
-    months: number[];
-    total: number;
 }
 
 export default function SalaryHistory({ refreshTrigger, onView, onEdit }: SalaryHistoryProps) {
@@ -68,21 +60,6 @@ export default function SalaryHistory({ refreshTrigger, onView, onEdit }: Salary
         }
     };
 
-    const summaries = useMemo<YearSummary[]>(() => {
-        const byYear = new Map<number, YearSummary>();
-        for (const salary of salaries) {
-            const date = new Date(salary.date);
-            const year = date.getFullYear();
-            const month = date.getMonth();
-            const summary = byYear.get(year) ?? { year, months: Array(12).fill(0), total: 0 };
-            const amount = Number(salary.netSalary ?? salary.grossSalary ?? 0);
-            summary.months[month] += amount;
-            summary.total += amount;
-            byYear.set(year, summary);
-        }
-        return [...byYear.values()].sort((a, b) => b.year - a.year);
-    }, [salaries]);
-
     if (loading) {
         return <TableSkeleton columns={6} rows={5} withHeader />;
     }
@@ -97,40 +74,7 @@ export default function SalaryHistory({ refreshTrigger, onView, onEdit }: Salary
     }
 
     return (
-        <div className="space-y-6">
-            <Card>
-                <CardHeader>
-                    <CardTitle>Monthly net income</CardTitle>
-                </CardHeader>
-                <CardContent className="overflow-x-auto">
-                    <Table className="min-w-[980px]">
-                        <TableHeader>
-                            <TableRow>
-                                <TableHead>Year</TableHead>
-                                {MONTHS.map((month) => <TableHead key={month} className="text-right">{month}</TableHead>)}
-                                <TableHead className="text-right">Total</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {summaries.map((summary) => (
-                                <TableRow key={summary.year}>
-                                    <TableCell className="font-semibold">{summary.year}</TableCell>
-                                    {summary.months.map((amount, month) => (
-                                        <TableCell key={month} className="whitespace-nowrap text-right text-muted-foreground">
-                                            {amount ? formatEuro(amount) : "—"}
-                                        </TableCell>
-                                    ))}
-                                    <TableCell className="whitespace-nowrap text-right font-semibold">{formatEuro(summary.total)}</TableCell>
-                                </TableRow>
-                            ))}
-                            {summaries.length === 0 && (
-                                <TableRow><TableCell colSpan={14} className="py-8 text-center text-muted-foreground">No salary records found.</TableCell></TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
-                </CardContent>
-            </Card>
-
+        <div>
             <Card>
                 <CardHeader>
                     <CardTitle>All records</CardTitle>

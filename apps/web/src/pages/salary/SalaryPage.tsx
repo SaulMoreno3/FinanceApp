@@ -1,10 +1,10 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { History, Plus } from "lucide-react";
 import SalaryList from "@/components/salary/SalaryList";
 import SalaryForm from "@/components/salary/SalaryForm";
-import SalaryDetailModal from "@/components/salary/SalaryDetail";
-import SalaryHistory from "@/components/salary/SalaryHistory";
+import SalaryCalendar from "@/components/salary/SalaryCalendar";
 import type { SalaryRecord } from "@/components/salary/salary.types";
 import {
     Dialog,
@@ -13,13 +13,11 @@ import {
     DialogTitle,
     DialogDescription,
 } from "@/components/ui/dialog";
-import { fetchAPI } from "@/lib/api";
 
 export default function SalaryPage() {
     const [isCreateOpen, setIsCreateOpen] = useState(false);
     const [refreshTrigger, setRefreshTrigger] = useState(0);
-    const [viewingId, setViewingId] = useState<string | null>(null);
-    const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+    const navigate = useNavigate();
 
     const [editingSalary, setEditingSalary] = useState<SalaryRecord | undefined>(undefined);
 
@@ -27,19 +25,6 @@ export default function SalaryPage() {
         setIsCreateOpen(false);
         setEditingSalary(undefined);
         setRefreshTrigger(prev => prev + 1);
-    };
-
-    const handleEdit = async (salary: SalaryRecord) => {
-        try {
-            const fullData = await fetchAPI<SalaryRecord>(`/salary/${salary.id}`);
-            setEditingSalary(fullData);
-            setIsCreateOpen(true);
-        } catch (error) {
-            console.error(error);
-            // Fallback to partial data if fetch fails
-            setEditingSalary(salary);
-            setIsCreateOpen(true);
-        }
     };
 
     const handleCancel = () => {
@@ -55,7 +40,7 @@ export default function SalaryPage() {
                     <p className="text-muted-foreground mt-1">Manage your payrolls and income history.</p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Button variant="outline" onClick={() => setIsHistoryOpen(true)} size="lg">
+                    <Button variant="outline" onClick={() => navigate("/salary/history")} size="lg">
                         <History className="w-4 h-4 mr-2" />
                         History
                     </Button>
@@ -67,6 +52,7 @@ export default function SalaryPage() {
             </div>
 
             <SalaryList refreshTrigger={refreshTrigger} />
+            <SalaryCalendar refreshTrigger={refreshTrigger} />
 
             {/* Create/Edit Modal */}
             <Dialog open={isCreateOpen} onOpenChange={(open) => {
@@ -89,23 +75,6 @@ export default function SalaryPage() {
                 </DialogContent>
             </Dialog>
 
-            {/* Detail Modal */}
-            <SalaryDetailModal
-                salaryId={viewingId}
-                onClose={() => setViewingId(null)}
-            />
-
-            <Dialog open={isHistoryOpen} onOpenChange={setIsHistoryOpen}>
-                <DialogContent className="max-w-7xl max-h-[92vh] overflow-y-auto">
-                    <DialogHeader>
-                        <DialogTitle>Salary history</DialogTitle>
-                        <DialogDescription className="text-muted-foreground">
-                            Review your records and monthly income totals by year.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <SalaryHistory refreshTrigger={refreshTrigger} onView={setViewingId} onEdit={handleEdit} />
-                </DialogContent>
-            </Dialog>
         </div>
     );
 }
