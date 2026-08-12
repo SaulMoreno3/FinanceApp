@@ -297,6 +297,11 @@ function EstimatedResult({ income, taxPaid }: { income: number; taxPaid: number 
         withholdings: taxPaid,
         advancePayments: 0,
     });
-    const isDue = estimate.result >= 0;
-    return <span className={isDue ? "text-rose-500" : "text-emerald-500"}><span className="mr-2 text-xs text-muted-foreground md:hidden">Estimated result</span>{isDue ? `To pay ${formatCurrency(estimate.result)}` : `Refund ${formatCurrency(Math.abs(estimate.result))}`}</span>;
+    const isDue = estimate.result > 0;
+    const label = estimate.result === 0
+        ? "—"
+        : isDue
+            ? `To pay ${formatCurrency(estimate.result)}`
+            : `Refund ${formatCurrency(Math.abs(estimate.result))}`;
+    return <span className={estimate.result === 0 ? "text-muted-foreground" : isDue ? "text-rose-500" : "text-emerald-500"}><span className="mr-2 text-xs text-muted-foreground md:hidden">Estimated result</span>{label}</span>;
 }
