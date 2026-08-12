@@ -237,6 +237,7 @@ model PortfolioDailySnapshot {
   netContributions Decimal                          @default(0) @db.Decimal(20, 8)
   dailyPnl         Decimal                          @default(0) @db.Decimal(20, 8)
   hasEstimates     Boolean                          @default(false)
+  marketValueAvailable Boolean                       @default(true)
   createdAt        DateTime                         @default(now()) @db.Timestamptz(6)
   updatedAt        DateTime                         @default(now()) @updatedAt @db.Timestamptz(6)
   user             User                             @relation(fields: [userId], references: [id], onDelete: Cascade)

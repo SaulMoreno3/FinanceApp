@@ -9,11 +9,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 const ranges = ["1D", "1W", "1M", "YTD", "1Y", "MAX"] as const;
 type HistoryRange = typeof ranges[number];
+type ChartMode = "VALUE" | "PERCENT";
 
 type HistoryPoint = {
     date: string;
     marketValue: number;
     performanceValue: number;
+    performancePercent: number;
     dailyPnl: number;
     hasEstimates: boolean;
 };
@@ -24,6 +26,7 @@ type PortfolioHistory = {
     currentValue: number;
     baselineValue: number;
     periodChange: number;
+    marketValueChange: number;
     periodChangePercent: number | null;
     hasEstimates: boolean;
     coverageStart: string;
@@ -50,6 +53,11 @@ const signedCurrency = new Intl.NumberFormat("en-GB", {
     maximumFractionDigits: 2,
 });
 
+function signedPercent(value: number | null) {
+    if (value === null) return "—";
+    return `${value >= 0 ? "+" : ""}${value.toFixed(2)}%`;
+}
+
 function dateLabel(value: string, range: HistoryRange) {
     return new Intl.DateTimeFormat("en-GB", range === "1D"
         ? { hour: "2-digit", minute: "2-digit" }
@@ -59,9 +67,10 @@ function dateLabel(value: string, range: HistoryRange) {
         .format(new Date(`${value}T12:00:00Z`));
 }
 
-function PerformanceTooltip({ active, payload }: {
+function PerformanceTooltip({ active, payload, mode }: {
     active?: boolean;
     payload?: Array<{ payload: HistoryPoint }>;
+    mode: ChartMode;
 }) {
     const point = payload?.[0]?.payload;
     if (!active || !point) return null;
@@ -70,7 +79,9 @@ function PerformanceTooltip({ active, payload }: {
             <p className="text-xs text-muted-foreground">
                 {new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" }).format(new Date(`${point.date}T12:00:00Z`))}
             </p>
-            <p className="mt-1.5 text-sm font-semibold tabular-nums">{currency.format(point.performanceValue)}</p>
+            <p className="mt-1.5 text-sm font-semibold tabular-nums">
+                {mode === "VALUE" ? currency.format(point.performanceValue) : `${point.performancePercent >= 0 ? "+" : ""}${point.performancePercent.toFixed(2)}%`}
+            </p>
             <div className="mt-2 flex items-center justify-between gap-4 text-[11px] text-muted-foreground">
                 <span>Market value</span>
                 <span className="tabular-nums">{currency.format(point.marketValue)}</span>
@@ -89,6 +100,7 @@ function pointDate(value: string) {
 
 export function PortfolioPerformanceChart() {
     const [range, setRange] = useState<HistoryRange>("YTD");
+    const [mode, setMode] = useState<ChartMode>("VALUE");
     const [history, setHistory] = useState<PortfolioHistory | null>(null);
     const [isLoading, setIsLoading] = useState(true);
     const [isSyncing, setIsSyncing] = useState(false);
@@ -161,31 +173,40 @@ export function PortfolioPerformanceChart() {
         }
     };
 
-    const positive = (history?.periodChange ?? 0) >= 0;
+    const chartPoints = useMemo(() => history?.points.map((point) => ({
+        ...point,
+        chartValue: mode === "VALUE" ? point.marketValue : point.performancePercent,
+    })) ?? [], [history, mode]);
+    const baseline = mode === "VALUE" ? (history?.baselineValue ?? 0) : 0;
+    const changeAmount = mode === "VALUE" ? (history?.marketValueChange ?? 0) : (history?.periodChangePercent ?? 0);
+    const changePercent = mode === "VALUE"
+        ? ((history?.baselineValue ?? 0) > 0 ? ((history?.marketValueChange ?? 0) / (history?.baselineValue ?? 1)) * 100 : null)
+        : (history?.periodChangePercent ?? null);
+    const positive = changeAmount >= 0;
     const lineColor = positive ? "#4ade80" : "#fb7185";
     const domain = useMemo<[number, number] | undefined>(() => {
-        if (!history?.points.length) return undefined;
-        const values = history.points.map((point) => point.performanceValue);
-        const minimum = Math.min(...values, history.baselineValue);
-        const maximum = Math.max(...values, history.baselineValue);
+        if (!chartPoints.length) return undefined;
+        const values = chartPoints.map((point) => point.chartValue);
+        const minimum = Math.min(...values, baseline);
+        const maximum = Math.max(...values, baseline);
         const padding = Math.max((maximum - minimum) * 0.16, Math.max(maximum, 1) * 0.008);
         return [minimum - padding, maximum + padding];
-    }, [history]);
+    }, [baseline, chartPoints]);
     const comparison = useMemo(() => {
         if (!history || !selectionStart || !selectionEnd || selectionStart === selectionEnd) return null;
-        const startIndex = history.points.findIndex((point) => point.date === selectionStart);
-        const endIndex = history.points.findIndex((point) => point.date === selectionEnd);
+        const startIndex = chartPoints.findIndex((point) => point.date === selectionStart);
+        const endIndex = chartPoints.findIndex((point) => point.date === selectionEnd);
         if (startIndex < 0 || endIndex < 0) return null;
-        const first = history.points[Math.min(startIndex, endIndex)];
-        const last = history.points[Math.max(startIndex, endIndex)];
-        const difference = last.performanceValue - first.performanceValue;
+        const first = chartPoints[Math.min(startIndex, endIndex)];
+        const last = chartPoints[Math.max(startIndex, endIndex)];
+        const difference = last.chartValue - first.chartValue;
         return {
             first,
             last,
             difference,
-            percentage: first.performanceValue > 0 ? (difference / first.performanceValue) * 100 : null,
+            relativePercentage: first.chartValue > 0 ? (difference / first.chartValue) * 100 : null,
         };
-    }, [history, selectionEnd, selectionStart]);
+    }, [chartPoints, history, selectionEnd, selectionStart]);
 
     return (
         <Card className="relative overflow-hidden border-border/70 bg-[#202121] text-white shadow-2xl shadow-black/10 dark:bg-[#1d1e1e]">
@@ -206,17 +227,32 @@ export function PortfolioPerformanceChart() {
                         ) : history ? (
                             <>
                                 <p className="mt-2 text-4xl font-light tracking-[-0.04em] tabular-nums md:text-5xl">
-                                    {currency.format(history.currentValue)}
+                                    {mode === "VALUE" ? currency.format(history.currentValue) : `${history.periodChangePercent === null ? "—" : `${history.periodChangePercent >= 0 ? "+" : ""}${history.periodChangePercent.toFixed(2)}%`}`}
                                 </p>
                                 <div className={`mt-2 flex items-center gap-2 text-sm font-semibold tabular-nums ${positive ? "text-green-400" : "text-rose-400"}`}>
-                                    <span>{positive ? "↗" : "↘"} {history.periodChangePercent === null ? "—" : `${Math.abs(history.periodChangePercent).toFixed(2)}%`}</span>
-                                    <span>({signedCurrency.format(history.periodChange)})</span>
+                                    <span>{positive ? "↗" : "↘"} {mode === "VALUE" ? signedPercent(changePercent) : signedPercent(history.periodChangePercent)}</span>
+                                    <span>({mode === "VALUE" ? signedCurrency.format(history.marketValueChange) : signedCurrency.format(history.periodChange)})</span>
                                 </div>
                             </>
                         ) : null}
                     </div>
 
                     <div className="flex flex-wrap items-center gap-1.5">
+                        <div className="mr-2 flex rounded-lg border border-white/10 bg-white/[0.04] p-0.5">
+                            {(["VALUE", "PERCENT"] as const).map((item) => (
+                                <button
+                                    key={item}
+                                    type="button"
+                                    onClick={() => {
+                                        clearSelection();
+                                        setMode(item);
+                                    }}
+                                    className={`rounded-md px-3 py-1.5 text-[11px] font-semibold transition-colors ${mode === item ? "bg-zinc-600 text-white" : "text-zinc-400 hover:text-zinc-200"}`}
+                                >
+                                    {item === "VALUE" ? "€ Value" : "% Return"}
+                                </button>
+                            ))}
+                        </div>
                         {ranges.map((item) => (
                             <button
                                 key={item}
@@ -263,9 +299,11 @@ export function PortfolioPerformanceChart() {
                                         <p className="mt-1 truncate text-xs text-zinc-400">{pointDate(comparison.first.date)} → {pointDate(comparison.last.date)}</p>
                                     </div>
                                     <div className={`shrink-0 text-right ${comparison.difference >= 0 ? "text-green-400" : "text-rose-400"}`}>
-                                        <p className="text-base font-bold tabular-nums">{signedCurrency.format(comparison.difference)}</p>
+                                        <p className="text-base font-bold tabular-nums">{mode === "VALUE" ? signedCurrency.format(comparison.difference) : `${comparison.difference >= 0 ? "+" : ""}${comparison.difference.toFixed(2)} pp`}</p>
                                         <p className="text-xs font-semibold tabular-nums">
-                                            {comparison.percentage === null ? "—" : `${comparison.percentage >= 0 ? "+" : ""}${comparison.percentage.toFixed(2)}%`}
+                                            {mode === "VALUE"
+                                                ? (comparison.relativePercentage === null ? "—" : `${comparison.relativePercentage >= 0 ? "+" : ""}${comparison.relativePercentage.toFixed(2)}%`)
+                                                : "percentage points"}
                                         </p>
                                     </div>
                                     <button
@@ -281,7 +319,7 @@ export function PortfolioPerformanceChart() {
                         )}
                         <ResponsiveContainer width="100%" height="100%">
                             <AreaChart
-                                data={history.points}
+                                data={chartPoints}
                                 margin={{ top: 30, right: 0, left: 0, bottom: 10 }}
                                 onMouseDown={beginSelection}
                                 onMouseMove={updateSelection}
@@ -304,20 +342,20 @@ export function PortfolioPerformanceChart() {
                                     padding={{ left: 4, right: 4 }}
                                 />
                                 <YAxis hide domain={domain} />
-                                <ReferenceLine y={history.baselineValue} stroke="#a1a1aa" strokeDasharray="2 5" strokeOpacity={0.48} />
+                                <ReferenceLine y={baseline} stroke="#a1a1aa" strokeDasharray="2 5" strokeOpacity={0.48} />
                                 {comparison && (
                                     <>
                                         <ReferenceArea x1={comparison.first.date} x2={comparison.last.date} fill={lineColor} fillOpacity={0.07} strokeOpacity={0} />
                                         <ReferenceLine x={comparison.first.date} stroke="#d4d4d8" strokeDasharray="3 5" strokeOpacity={0.65} />
                                         <ReferenceLine x={comparison.last.date} stroke="#d4d4d8" strokeDasharray="3 5" strokeOpacity={0.65} />
-                                        <ReferenceDot x={comparison.first.date} y={comparison.first.performanceValue} r={4.5} fill="#18181b" stroke={lineColor} strokeWidth={2.5} />
-                                        <ReferenceDot x={comparison.last.date} y={comparison.last.performanceValue} r={4.5} fill="#18181b" stroke={lineColor} strokeWidth={2.5} />
+                                        <ReferenceDot x={comparison.first.date} y={comparison.first.chartValue} r={4.5} fill="#18181b" stroke={lineColor} strokeWidth={2.5} />
+                                        <ReferenceDot x={comparison.last.date} y={comparison.last.chartValue} r={4.5} fill="#18181b" stroke={lineColor} strokeWidth={2.5} />
                                     </>
                                 )}
-                                <Tooltip content={<PerformanceTooltip />} cursor={{ stroke: "#a1a1aa", strokeDasharray: "3 5", strokeOpacity: 0.4 }} />
+                                <Tooltip content={<PerformanceTooltip mode={mode} />} cursor={{ stroke: "#a1a1aa", strokeDasharray: "3 5", strokeOpacity: 0.4 }} />
                                 <Area
                                     type="monotone"
-                                    dataKey="performanceValue"
+                                    dataKey="chartValue"
                                     stroke={lineColor}
                                     strokeWidth={2.5}
                                     fill="url(#portfolioPerformanceFill)"

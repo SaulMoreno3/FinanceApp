@@ -128,6 +128,7 @@ export class PortfolioHistoryService {
             netContributions: number;
             dailyPnl: number;
             hasEstimates: boolean;
+            marketValueAvailable: boolean;
         }> = [];
         const positionRows: Array<{
             date: string;
@@ -166,6 +167,7 @@ export class PortfolioHistoryService {
             let netContributions = 0;
             let dayFees = 0;
             let dayHasEstimates = false;
+            let marketValueAvailable = true;
             for (const trade of tradesByDate.get(key) ?? []) {
                 const instrumentId = trade.instrumentId!;
                 const state = positions.get(instrumentId) ?? { quantity: 0, lots: [], realizedGain: 0 };
@@ -216,7 +218,7 @@ export class PortfolioHistoryService {
                 const trade = trades.find((candidate) => candidate.instrumentId === instrumentId)!;
                 const price = latestPrices.get(trade.listingId!);
                 if (!price) {
-                    dayHasEstimates = true;
+                    marketValueAvailable = false;
                     continue;
                 }
                 const fx = price.currency === Currency.EUR ? 1 : marketFx;
@@ -259,6 +261,7 @@ export class PortfolioHistoryService {
                 netContributions,
                 dailyPnl,
                 hasEstimates: dayHasEstimates,
+                marketValueAvailable,
             });
             previousMarketValue = marketValue;
         }
@@ -300,14 +303,37 @@ export class PortfolioHistoryService {
             where: { userId, currency: Currency.EUR, date: { gte: startDate } },
             orderBy: { date: 'asc' },
         });
-        const first = points[0] ?? latest;
+        // Early snapshots can legitimately be zero while the first market
+        // price is still unavailable. They must not become the performance
+        // baseline, otherwise Max shows a fake jump from 0 EUR.
+        const firstPositiveIndex = points.findIndex((point) => point.marketValueAvailable && Number(point.marketValue) > 0);
+        const lastUnavailableIndex = points.reduce(
+            (lastIndex, point, index) => point.marketValueAvailable ? lastIndex : index,
+            -1,
+        );
+        const firstValuedIndex = Math.max(firstPositiveIndex, lastUnavailableIndex + 1);
+        const valuedPoints = firstValuedIndex >= 0
+            ? points.slice(firstValuedIndex).filter((point) => point.marketValueAvailable)
+            : [];
+        const first = valuedPoints[0] ?? latest;
         let cumulativePnl = 0;
-        const chartPoints = points.map((point, index) => {
-            if (index > 0) cumulativePnl += Number(point.dailyPnl);
+        let previousPointIndex = firstValuedIndex;
+        const chartPoints = valuedPoints.map((point, index) => {
+            const pointIndex = points.indexOf(point);
+            if (index > 0 && pointIndex === previousPointIndex + 1) {
+                cumulativePnl += Number(point.dailyPnl);
+            } else if (index > 0) {
+                // A missing-price interval is a valuation gap, not a loss.
+                // Start a fresh performance segment when prices resume.
+                cumulativePnl = 0;
+            }
+            previousPointIndex = pointIndex;
+            const baselineValue = Number(first.marketValue);
             return {
                 date: dayKey(point.date),
                 marketValue: Number(point.marketValue),
                 performanceValue: Number(first.marketValue) + cumulativePnl,
+                performancePercent: baselineValue > 0 ? (cumulativePnl / baselineValue) * 100 : 0,
                 dailyPnl: Number(point.dailyPnl),
                 hasEstimates: point.hasEstimates,
             };
@@ -321,13 +347,10 @@ export class PortfolioHistoryService {
             currentValue: Number(latest.marketValue),
             baselineValue,
             periodChange,
+            marketValueChange: Number(latest.marketValue) - baselineValue,
             periodChangePercent: baselineValue > 0 ? (periodChange / baselineValue) * 100 : null,
-            hasEstimates: points.some((point) => point.hasEstimates),
-            coverageStart: dayKey((await prisma.portfolioDailySnapshot.findFirst({
-                where: { userId, currency: Currency.EUR },
-                orderBy: { date: 'asc' },
-                select: { date: true },
-            }))!.date),
+            hasEstimates: valuedPoints.some((point) => point.hasEstimates),
+            coverageStart: dayKey(first.date),
             coverageEnd: dayKey(latest.date),
             points: chartPoints,
         };
