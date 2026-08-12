@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import TaxEstimator from "./TaxEstimator";
 
 interface TaxReturn {
     id: string;
@@ -96,6 +97,7 @@ export default function TaxesPage() {
     };
 
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- initial remote data synchronization
         void loadTaxReturns();
     }, []);
 
@@ -191,6 +193,8 @@ export default function TaxesPage() {
                     <CardContent><p className="text-2xl font-bold">{formatCurrency(totalNetIncome)}</p><p className="text-xs text-muted-foreground">After income tax withheld</p></CardContent>
                 </Card>
             </div>
+
+            <TaxEstimator annualSummaries={annualSummaries} />
 
             <Card>
                 <CardHeader><CardTitle>Annual tax overview</CardTitle></CardHeader>
