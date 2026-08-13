@@ -8,6 +8,7 @@ import salaryPasswordRouter from './salary-password/salary-password.routes';
 import pricesRouter from './prices/price.routes';
 import projectsRouter from './projects/projects.routes';
 import taxesRouter from './taxes/taxes.routes';
+import debtsRouter from './debts/debts.routes';
 
 import authRouter from './auth/auth.routes';
 
@@ -23,5 +24,6 @@ router.use("/salary-passwords", salaryPasswordRouter);
 router.use("/prices", pricesRouter);
 router.use("/projects", projectsRouter);
 router.use("/taxes", taxesRouter);
+router.use("/debts", debtsRouter);
 
 export default router;

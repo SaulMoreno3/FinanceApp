@@ -43,6 +43,12 @@ enum ProjectPaymentStatus {
   PAID
 }
 
+enum DebtStatus {
+  ACTIVE
+  PAID_OFF
+  ARCHIVED
+}
+
 model User {
   id                 String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
   email              String                   @unique @db.VarChar(255)
@@ -65,6 +71,7 @@ model User {
   taxReturns         TaxReturn[]
   projects           Project[]
   portfolioSnapshots PortfolioDailySnapshot[]
+  debts              Debt[]
 
   @@map("users")
 }
@@ -110,6 +117,35 @@ model ProjectEntry {
   @@index([projectId, date])
   @@index([projectId, paymentStatus])
   @@map("project_entries")
+}
+
+model Debt {
+  id                String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name              String     @db.VarChar(160)
+  lender            String?    @db.VarChar(160)
+  assetName         String?    @db.VarChar(160)
+  originalPrincipal Decimal    @db.Decimal(14, 2)
+  totalRepayable    Decimal?   @db.Decimal(14, 2)
+  currentBalance    Decimal    @db.Decimal(14, 2)
+  interestRate      Decimal?   @db.Decimal(8, 4)
+  apr               Decimal?   @db.Decimal(8, 4)
+  monthlyPayment    Decimal?   @db.Decimal(14, 2)
+  totalPayments     Int?
+  paidPayments      Int        @default(0)
+  startDate         DateTime?  @db.Date
+  maturityDate      DateTime?  @db.Date
+  nextPaymentDate   DateTime?  @db.Date
+  currency          Currency   @default(EUR)
+  status            DebtStatus @default(ACTIVE)
+  notes             String?
+  userId            String     @db.Uuid
+  createdAt         DateTime   @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime   @default(now()) @updatedAt @db.Timestamptz(6)
+  user              User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, status])
+  @@map("debts")
 }
 
 model StockTrade {
@@ -224,24 +260,24 @@ model MarketFxRate {
 }
 
 model PortfolioDailySnapshot {
-  id               String                           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId           String                           @db.Uuid
-  date             DateTime                         @db.Date
-  currency         Currency                         @default(EUR)
-  marketValue      Decimal                          @db.Decimal(20, 8)
-  costBasis        Decimal                          @db.Decimal(20, 8)
-  realizedGain     Decimal                          @db.Decimal(20, 8)
-  unrealizedGain   Decimal                          @db.Decimal(20, 8)
-  dividends        Decimal                          @default(0) @db.Decimal(20, 8)
-  fees             Decimal                          @default(0) @db.Decimal(20, 8)
-  netContributions Decimal                          @default(0) @db.Decimal(20, 8)
-  dailyPnl         Decimal                          @default(0) @db.Decimal(20, 8)
-  hasEstimates     Boolean                          @default(false)
-  marketValueAvailable Boolean                       @default(true)
-  createdAt        DateTime                         @default(now()) @db.Timestamptz(6)
-  updatedAt        DateTime                         @default(now()) @updatedAt @db.Timestamptz(6)
-  user             User                             @relation(fields: [userId], references: [id], onDelete: Cascade)
-  positions        PortfolioPositionDailySnapshot[]
+  id                   String                           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId               String                           @db.Uuid
+  date                 DateTime                         @db.Date
+  currency             Currency                         @default(EUR)
+  marketValue          Decimal                          @db.Decimal(20, 8)
+  costBasis            Decimal                          @db.Decimal(20, 8)
+  realizedGain         Decimal                          @db.Decimal(20, 8)
+  unrealizedGain       Decimal                          @db.Decimal(20, 8)
+  dividends            Decimal                          @default(0) @db.Decimal(20, 8)
+  fees                 Decimal                          @default(0) @db.Decimal(20, 8)
+  netContributions     Decimal                          @default(0) @db.Decimal(20, 8)
+  dailyPnl             Decimal                          @default(0) @db.Decimal(20, 8)
+  hasEstimates         Boolean                          @default(false)
+  marketValueAvailable Boolean                          @default(true)
+  createdAt            DateTime                         @default(now()) @db.Timestamptz(6)
+  updatedAt            DateTime                         @default(now()) @updatedAt @db.Timestamptz(6)
+  user                 User                             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  positions            PortfolioPositionDailySnapshot[]
 
   @@unique([userId, date, currency])
   @@index([userId, date])
