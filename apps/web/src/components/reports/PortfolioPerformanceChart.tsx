@@ -118,7 +118,7 @@ export function PortfolioPerformanceChart() {
         setIsLoading(true);
         setError(null);
         try {
-            setHistory(await fetchAPI<PortfolioHistory>(`/portfolio/history?range=${selectedRange}`));
+            setHistory(await fetchAPI<PortfolioHistory>(`/portfolio/history?range=${selectedRange}`, { cache: "no-store" }));
         } catch (loadError) {
             setError(loadError instanceof Error ? loadError.message : "Portfolio history is unavailable");
         } finally {
