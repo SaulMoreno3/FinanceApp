@@ -15,6 +15,17 @@ function serialize(row: any) {
         'apr', 'monthlyPayment',
     ];
     const result = { ...row };
+    for (const field of ['startDate', 'maturityDate', 'nextPaymentDate']) {
+        const value = row[field];
+        if (value instanceof Date) {
+            const year = value.getFullYear();
+            const month = String(value.getMonth() + 1).padStart(2, '0');
+            const day = String(value.getDate()).padStart(2, '0');
+            result[field] = `${year}-${month}-${day}`;
+        } else if (value) {
+            result[field] = String(value).slice(0, 10);
+        }
+    }
     for (const field of numericFields) {
         result[field] = row[field] === null || row[field] === undefined ? null : Number(row[field]);
     }
