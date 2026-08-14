@@ -21,6 +21,7 @@ const ProjectsPage = lazy(() => import("@/pages/projects/ProjectsPage"));
 const AccountSettingsPage = lazy(() => import("@/pages/settings/AccountSettingsPage"));
 const SupportPage = lazy(() => import("@/pages/support/SupportPage"));
 const TaxesPage = lazy(() => import("@/pages/taxes/TaxesPage"));
+const DebtsPage = lazy(() => import("@/pages/debts/DebtsPage"));
 
 const deferred = (page: ReactNode) => <Suspense fallback={null}>{page}</Suspense>;
 
@@ -75,6 +76,10 @@ const router = createBrowserRouter([
               {
                 path: "taxes",
                 element: deferred(<TaxesPage />),
+              },
+              {
+                path: "debts",
+                element: deferred(<DebtsPage />),
               },
               {
                 path: "reports",
