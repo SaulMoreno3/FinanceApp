@@ -25,3 +25,13 @@ export type Debt = {
 };
 
 export type DebtFormData = Omit<Debt, 'id' | 'remainingPayments' | 'paidAmount' | 'progressPercent'>;
+
+export type DebtScheduleRow = {
+    id: string;
+    installment: number;
+    dueDate: string;
+    paymentAmount: number;
+    principalAmount: number;
+    interestAmount: number;
+    balanceAfter: number;
+};
