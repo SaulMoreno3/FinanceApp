@@ -15,6 +15,14 @@ export class DebtsController {
         res.json(debt);
     }
 
+    async schedule(req: any, res: Response) {
+        const validation = debtParamsSchema.safeParse({ params: req.params });
+        if (!validation.success) return res.status(400).json({ error: 'Invalid debt id' });
+        const debt = await debtsService.get(req.user!.id, validation.data.params.id);
+        if (!debt) return res.status(404).json({ error: 'Debt not found' });
+        res.json({ data: await debtsService.getSchedule(req.user!.id, validation.data.params.id) });
+    }
+
     async create(req: any, res: Response) {
         const body = { ...req.body, ...Object.fromEntries(
             ['originalPrincipal', 'totalRepayable', 'currentBalance', 'interestRate', 'apr', 'monthlyPayment', 'totalPayments', 'paidPayments']

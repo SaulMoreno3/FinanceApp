@@ -64,6 +64,28 @@ export class DebtsService {
         return serialize(result.rows[0]);
     }
 
+    async getSchedule(userId: string, id: string) {
+        const result = await pool.query(
+            `SELECT s.id, s.installment, s."dueDate", s."paymentAmount", s."principalAmount",
+                    s."interestAmount", s."balanceAfter"
+             FROM debt_schedule s
+             INNER JOIN debts d ON d.id = s."debtId"
+             WHERE s."debtId" = $1 AND d."userId" = $2
+             ORDER BY s.installment ASC`,
+            [id, userId],
+        );
+        return result.rows.map((row) => ({
+            ...row,
+            dueDate: row.dueDate instanceof Date
+                ? `${row.dueDate.getFullYear()}-${String(row.dueDate.getMonth() + 1).padStart(2, '0')}-${String(row.dueDate.getDate()).padStart(2, '0')}`
+                : String(row.dueDate).slice(0, 10),
+            paymentAmount: Number(row.paymentAmount),
+            principalAmount: Number(row.principalAmount),
+            interestAmount: Number(row.interestAmount),
+            balanceAfter: Number(row.balanceAfter),
+        }));
+    }
+
     async create(userId: string, data: DebtBody) {
         const result = await pool.query(
             `INSERT INTO debts (
