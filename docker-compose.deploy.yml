@@ -38,7 +38,7 @@ services:
     depends_on:
       db:
         condition: service_healthy
-    command: ["sh", "-c", "pnpm db:migrate && pnpm start"]
+    command: ["sh", "-c", "pnpm --filter api db:migrate && pnpm --filter api start"]
 
   web:
     build:
