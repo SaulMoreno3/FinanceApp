@@ -34,7 +34,7 @@ services:
       EODHD_API_KEY: ${EODHD_API_KEY:-}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080,http://127.0.0.1:8080}
     volumes:
-      - ./data/uploads:/app/apps/api/uploads
+      - ./data/uploads:/app/uploads
     depends_on:
       db:
         condition: service_healthy

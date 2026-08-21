@@ -27,7 +27,7 @@ COPY --from=build /app/apps/api/src/generated apps/api/src/generated
 COPY --from=build /app/node_modules node_modules
 COPY --from=build /app/apps/api/node_modules apps/api/node_modules
 
-RUN mkdir -p /app/apps/api/uploads
-WORKDIR /app/apps/api
+RUN mkdir -p /app/uploads
+WORKDIR /app
 EXPOSE 3001
-CMD ["pnpm", "start"]
+CMD ["pnpm", "--filter", "api", "start"]
