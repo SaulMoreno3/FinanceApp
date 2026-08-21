@@ -38,6 +38,11 @@ app.use("/auth/register", authLimiter);
 import { errorHandler } from "./common/middleware/errorHandler";
 import { requestLogger } from "./common/middleware/requestLogger";
 
+const configuredOrigins = (process.env.CORS_ORIGINS ?? "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+
 const trustedOrigins = new Set([
     'http://localhost:5173',
     'http://127.0.0.1:5173',
@@ -46,6 +51,7 @@ const trustedOrigins = new Set([
     'http://localhost:4000',
     'tauri://localhost',
     'https://tauri.localhost',
+    ...configuredOrigins,
 ]);
 
 app.use(cors({

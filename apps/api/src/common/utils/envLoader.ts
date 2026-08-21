@@ -20,7 +20,12 @@ export default function loadEnv() {
 
     if (!fs.existsSync(envFile)) {
         if (process.env.NODE_ENV === "production") {
-            throw new Error("Missing .env file. Production configuration must be provided explicitly.");
+            for (const key of [...Object.keys(REQUIRED_ENV_VARS), ...GENERATED_SECRET_VARS]) {
+                if (!process.env[key]) {
+                    throw new Error(`Missing required production environment variable: ${key}`);
+                }
+            }
+            return;
         }
 
         const lines: string[] = [];
@@ -34,7 +39,9 @@ export default function loadEnv() {
         console.warn("[WARNING] Created a local .env with unique development secrets.");
     }
 
-    process.loadEnvFile(envFile);
+    if (fs.existsSync(envFile)) {
+        process.loadEnvFile(envFile);
+    }
 
     for (const key of GENERATED_SECRET_VARS) {
         if (!process.env[key]) {

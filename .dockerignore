@@ -1,0 +1,16 @@
+.git
+.github
+**/.env
+**/.env.*
+!deploy.env.example
+**/node_modules
+**/dist
+**/build
+**/uploads
+data
+*.pdf
+*.csv
+*.xlsx
+*.xls
+*.doc
+*.docx
