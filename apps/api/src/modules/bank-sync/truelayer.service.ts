@@ -77,7 +77,10 @@ export class TrueLayerService {
             state,
         });
         const providerId = process.env.TRUELAYER_PROVIDER_ID;
-        if (providerId) params.set('providers', providerId);
+        if (providerId) {
+            params.set('providers', providerId);
+            params.set('provider_id', providerId);
+        }
         return `${AUTH_URL}/?${params.toString()}`;
     }
 
