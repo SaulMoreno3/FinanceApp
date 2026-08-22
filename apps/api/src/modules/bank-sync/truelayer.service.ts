@@ -8,6 +8,7 @@ const AUTH_URL = process.env.TRUELAYER_AUTH_URL ?? 'https://auth.truelayer.com';
 const API_URL = process.env.TRUELAYER_API_URL ?? 'https://api.truelayer.com';
 const FRONTEND_URL = process.env.WEB_APP_URL ?? 'https://finance.saulmoreno.es';
 const SCOPES = 'info accounts balance transactions offline_access';
+const INITIAL_HISTORY_YEARS = 6;
 
 type TokenResponse = {
     access_token: string;
@@ -241,7 +242,7 @@ export class TrueLayerService {
 
                 const from = connection.lastSyncAt
                     ? new Date(connection.lastSyncAt.getTime() - 3 * 24 * 60 * 60 * 1000)
-                    : new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
+                    : this.initialHistoryStart();
                 const transactions = await this.fetchTransactions(accessToken, account.account_id, from);
                 for (const transaction of transactions) {
                     const providerTransactionId = transaction.transaction_id
@@ -280,7 +281,7 @@ export class TrueLayerService {
     private async fetchTransactions(accessToken: string, accountId: string, from: Date) {
         const all: TrueLayerTransaction[] = [];
         let cursor: string | undefined;
-        for (let page = 0; page < 10; page++) {
+        for (let page = 0; page < 100; page++) {
             const response = await this.api<{ results: TrueLayerTransaction[]; meta?: { cursors?: { next?: string } } }>(
                 accessToken,
                 `/data/v1/accounts/${encodeURIComponent(accountId)}/transactions`,
@@ -291,6 +292,12 @@ export class TrueLayerService {
             if (!cursor) break;
         }
         return all;
+    }
+
+    private initialHistoryStart() {
+        const start = new Date();
+        start.setFullYear(start.getFullYear() - INITIAL_HISTORY_YEARS);
+        return start;
     }
 
     async getStatus(userId: string) {
