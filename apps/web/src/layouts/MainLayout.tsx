@@ -13,7 +13,8 @@ import {
   Banknote,
   FolderKanban,
   ReceiptText,
-  CreditCard
+  CreditCard,
+  WalletCards
 } from "lucide-react";
 import { useState } from "react";
 import { cn } from "@/lib/utils";
@@ -28,6 +29,7 @@ export default function MainLayout() {
     { icon: LineChart, label: "Portfolio", path: "/portfolio" },
     { icon: Landmark, label: "Net Worth", path: "/networth" },
     { icon: ArrowRightLeft, label: "Transactions", path: "/transactions" },
+    { icon: WalletCards, label: "Banking", path: "/banking" },
     { icon: PieChart, label: "Reports", path: "/reports" },
     { icon: Banknote, label: "Salaries", path: "/salary" },
     { icon: ReceiptText, label: "Taxes", path: "/taxes" },
@@ -122,8 +124,8 @@ export default function MainLayout() {
           <div />
         </header>
 
-        <div className="flex-1 flex flex-col overflow-y-auto">
-          <div className="max-w-[1600px] mx-auto w-full h-full">
+        <div className="app-scrollbar flex-1 flex flex-col overflow-y-auto">
+          <div className="mx-auto h-full w-full max-w-7xl">
             <Outlet />
           </div>
         </div>

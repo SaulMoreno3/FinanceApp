@@ -29,6 +29,21 @@ export class BankSyncController {
         res.json(await trueLayerService.getStatus(req.user!.id));
     }
 
+    async overview(req: any, res: Response) {
+        res.json(await trueLayerService.getOverview(req.user!.id));
+    }
+
+    async transactions(req: any, res: Response) {
+        res.json(await trueLayerService.getTransactions(req.user!.id, {
+            page: Number(req.query.page) || 1,
+            limit: Number(req.query.limit) || 50,
+            accountId: typeof req.query.accountId === 'string' ? req.query.accountId : undefined,
+            category: typeof req.query.category === 'string' ? req.query.category : undefined,
+            from: typeof req.query.from === 'string' ? req.query.from : undefined,
+            to: typeof req.query.to === 'string' ? req.query.to : undefined,
+        }));
+    }
+
     async sync(req: any, res: Response) {
         try {
             res.json({ data: await trueLayerService.syncForUser(req.user!.id) });

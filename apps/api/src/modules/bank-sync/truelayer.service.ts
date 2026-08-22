@@ -239,7 +239,7 @@ export class TrueLayerService {
                 const from = connection.lastSyncAt
                     ? new Date(connection.lastSyncAt.getTime() - 3 * 24 * 60 * 60 * 1000)
                     : new Date(Date.now() - 90 * 24 * 60 * 60 * 1000);
-                const transactions = await this.getTransactions(accessToken, account.account_id, from);
+                const transactions = await this.fetchTransactions(accessToken, account.account_id, from);
                 for (const transaction of transactions) {
                     const providerTransactionId = transaction.transaction_id
                         ?? transaction.normalised_provider_transaction_id
@@ -274,7 +274,7 @@ export class TrueLayerService {
         }
     }
 
-    private async getTransactions(accessToken: string, accountId: string, from: Date) {
+    private async fetchTransactions(accessToken: string, accountId: string, from: Date) {
         const all: TrueLayerTransaction[] = [];
         let cursor: string | undefined;
         for (let page = 0; page < 10; page++) {
@@ -301,6 +301,60 @@ export class TrueLayerService {
             connected: connection.status === 'CONNECTED', status: connection.status,
             lastSyncAt: connection.lastSyncAt, lastError: connection.lastError,
             accounts: connection.accounts.map(account => ({ ...account, balance: account.balance ? Number(account.balance) : null, availableBalance: account.availableBalance ? Number(account.availableBalance) : null })),
+        };
+    }
+
+    async getOverview(userId: string) {
+        const status = await this.getStatus(userId);
+        const monthStart = new Date();
+        monthStart.setDate(1);
+        monthStart.setHours(0, 0, 0, 0);
+        const [recent, monthRows] = await Promise.all([
+            prisma.bankTransaction.findMany({ where: { userId }, orderBy: { date: 'desc' }, take: 8, include: { account: { select: { name: true, currency: true } } } }),
+            prisma.bankTransaction.findMany({ where: { userId, date: { gte: monthStart } }, select: { amount: true, category: true, currency: true } }),
+        ]);
+        const byCurrency = new Map<string, { income: number; expenses: number }>();
+        const byCategory = new Map<string, number>();
+        for (const row of monthRows) {
+            const category = row.category || 'Sin categoría';
+            const currency = row.currency || 'EUR';
+            const current = byCurrency.get(currency) ?? { income: 0, expenses: 0 };
+            if (Number(row.amount) >= 0) current.income += Number(row.amount);
+            else current.expenses += Math.abs(Number(row.amount));
+            byCurrency.set(currency, current);
+            const categoryKey = `${category}|||${currency}`;
+            byCategory.set(categoryKey, (byCategory.get(categoryKey) ?? 0) + Math.abs(Number(row.amount)));
+        }
+        return {
+            ...status,
+            month: {
+                byCurrency: [...byCurrency.entries()].map(([currency, values]) => ({ currency, ...values, net: values.income - values.expenses })),
+                byCategory: [...byCategory.entries()].map(([key, amount]) => { const [category, currency] = key.split('|||'); return { category, currency, amount }; }).sort((a, b) => b.amount - a.amount),
+            },
+            recent: recent.map(transaction => ({
+                ...transaction,
+                amount: Number(transaction.amount),
+                account: transaction.account,
+            })),
+        };
+    }
+
+    async getTransactions(userId: string, query: { page?: number; limit?: number; accountId?: string; category?: string; from?: string; to?: string }) {
+        const page = Math.max(1, query.page ?? 1);
+        const limit = Math.min(100, Math.max(1, query.limit ?? 50));
+        const where: any = {
+            userId,
+            ...(query.accountId ? { accountId: query.accountId } : {}),
+            ...(query.category ? { category: query.category } : {}),
+            ...(query.from || query.to ? { date: { ...(query.from ? { gte: new Date(query.from) } : {}), ...(query.to ? { lte: new Date(query.to) } : {}) } } : {}),
+        };
+        const [transactions, total] = await Promise.all([
+            prisma.bankTransaction.findMany({ where, orderBy: { date: 'desc' }, skip: (page - 1) * limit, take: limit, include: { account: { select: { name: true, currency: true } } } }),
+            prisma.bankTransaction.count({ where }),
+        ]);
+        return {
+            data: transactions.map(transaction => ({ ...transaction, amount: Number(transaction.amount), rawData: undefined })),
+            meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
         };
     }
 

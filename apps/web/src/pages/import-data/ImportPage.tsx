@@ -7,6 +7,7 @@ import { CheckCircle2, Clock, Link2, Loader2, RefreshCw, Unlink } from 'lucide-r
 // Import FilePond styles
 import { fetchAPI, postAPI } from '@/lib/api';
 import 'filepond/dist/filepond.min.css';
+import { Link } from 'react-router-dom';
 
 export default function ImportPage() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -144,7 +145,7 @@ export default function ImportPage() {
     };
 
     return (
-        <div className="container mx-auto p-6 space-y-8">
+        <div className="space-y-8 p-4 md:p-8">
             <div className="flex flex-col gap-2">
                 <h1 className="text-3xl font-bold tracking-tight">Import Data</h1>
                 <p className="text-muted-foreground">
@@ -175,6 +176,7 @@ export default function ImportPage() {
                                 </div>}
                                 {bankStatus.lastError && <p className="text-sm text-destructive">{bankStatus.lastError}</p>}
                                 <div className="flex flex-wrap gap-2">
+                                    <Link to="/banking" className="inline-flex h-9 items-center gap-2 rounded-md border px-4 text-sm font-medium">Ver cuentas e historial</Link>
                                     <button onClick={syncBank} disabled={bankBusy} className="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50"><RefreshCw className="h-4 w-4" /> Sincronizar ahora</button>
                                     <button onClick={disconnectBank} disabled={bankBusy} className="inline-flex h-9 items-center gap-2 rounded-md border px-4 text-sm font-medium disabled:opacity-50"><Unlink className="h-4 w-4" /> Desconectar</button>
                                 </div>

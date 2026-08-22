@@ -23,6 +23,8 @@ const SupportPage = lazy(() => import("@/pages/support/SupportPage"));
 const TaxesPage = lazy(() => import("@/pages/taxes/TaxesPage"));
 const DebtsPage = lazy(() => import("@/pages/debts/DebtsPage"));
 const DebtDetailPage = lazy(() => import("@/pages/debts/DebtDetailPage"));
+const BankingPage = lazy(() => import("@/pages/banking/BankingPage"));
+const BankingHistoryPage = lazy(() => import("@/pages/banking/BankingHistoryPage"));
 
 const deferred = (page: ReactNode) => <Suspense fallback={null}>{page}</Suspense>;
 
@@ -66,6 +68,14 @@ const router = createBrowserRouter([
               {
                 path: "import",
                 element: deferred(<ImportPage />),
+              },
+              {
+                path: "banking",
+                element: deferred(<BankingPage />),
+              },
+              {
+                path: "banking/history",
+                element: deferred(<BankingHistoryPage />),
               },
               {
                 path: "salary",
