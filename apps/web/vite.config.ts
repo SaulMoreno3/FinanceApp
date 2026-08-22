@@ -10,7 +10,8 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  base: "./",
+  // Assets are served from the domain root; relative paths break on nested SPA routes.
+  base: "/",
   server: {
     host: "localhost",
     port: 5173,
