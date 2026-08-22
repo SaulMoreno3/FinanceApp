@@ -243,7 +243,7 @@ export class TrueLayerService {
                 const from = connection.lastSyncAt
                     ? new Date(connection.lastSyncAt.getTime() - 3 * 24 * 60 * 60 * 1000)
                     : this.initialHistoryStart();
-                const transactions = await this.fetchTransactions(accessToken, account.account_id, from);
+                const transactions = await this.fetchTransactions(accessToken, account.account_id, from, new Date());
                 for (const transaction of transactions) {
                     const providerTransactionId = transaction.transaction_id
                         ?? transaction.normalised_provider_transaction_id
@@ -278,14 +278,18 @@ export class TrueLayerService {
         }
     }
 
-    private async fetchTransactions(accessToken: string, accountId: string, from: Date) {
+    private async fetchTransactions(accessToken: string, accountId: string, from: Date, to: Date) {
         const all: TrueLayerTransaction[] = [];
         let cursor: string | undefined;
         for (let page = 0; page < 100; page++) {
             const response = await this.api<{ results: TrueLayerTransaction[]; meta?: { cursors?: { next?: string } } }>(
                 accessToken,
                 `/data/v1/accounts/${encodeURIComponent(accountId)}/transactions`,
-                { from: from.toISOString(), ...(cursor ? { cursor } : {}) },
+                {
+                    from: from.toISOString().slice(0, 10),
+                    to: to.toISOString().slice(0, 10),
+                    ...(cursor ? { cursor } : {}),
+                },
             );
             all.push(...(response.results ?? []));
             cursor = response.meta?.cursors?.next;
