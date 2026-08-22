@@ -37,6 +37,7 @@ app.use("/auth/register", authLimiter);
 // Middleware
 import { errorHandler } from "./common/middleware/errorHandler";
 import { requestLogger } from "./common/middleware/requestLogger";
+import { trueLayerService } from "./modules/bank-sync/truelayer.service";
 
 const configuredOrigins = (process.env.CORS_ORIGINS ?? "")
     .split(",")
@@ -81,3 +82,10 @@ app.use(errorHandler);
 // Start server
 const PORT = process.env.PORT || 3001; // Fallback to 3001 if env missing
 app.listen(PORT, () => console.log(`API on :${PORT}`));
+
+// A daily background sync. The user can also trigger /bank-sync/sync manually.
+if (process.env.NODE_ENV === 'production' || process.env.BANK_SYNC_ENABLED === 'true') {
+    const runBankSync = () => trueLayerService.syncAllConnections().catch(error => console.error('[bank-sync]', error));
+    setTimeout(runBankSync, 30_000);
+    setInterval(runBankSync, 24 * 60 * 60 * 1000);
+}

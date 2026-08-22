@@ -72,6 +72,9 @@ model User {
   projects           Project[]
   portfolioSnapshots PortfolioDailySnapshot[]
   debts              Debt[]
+  bankConnections    BankConnection[]
+  bankAccounts       BankAccount[]
+  bankTransactions   BankTransaction[]
 
   @@map("users")
 }
@@ -342,6 +345,86 @@ model CashTransfer {
   @@unique([userId, date, currency, type, value])
   @@index([userId])
   @@map("cash_transfers")
+}
+
+enum BankConnectionStatus {
+  PENDING
+  CONNECTED
+  ERROR
+  REAUTH_REQUIRED
+  DISCONNECTED
+}
+
+model BankConnection {
+  id                    String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId                String               @db.Uuid
+  provider              String               @db.VarChar(40)
+  status                BankConnectionStatus @default(PENDING)
+  accessTokenEncrypted  String?
+  accessTokenIv         String?
+  refreshTokenEncrypted String?
+  refreshTokenIv        String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  oauthStateHash        String?              @db.VarChar(128)
+  lastSyncAt            DateTime?
+  lastError             String?
+  createdAt             DateTime             @default(now()) @db.Timestamptz(6)
+  updatedAt             DateTime             @default(now()) @updatedAt @db.Timestamptz(6)
+  user                  User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accounts              BankAccount[]
+
+  @@unique([userId, provider])
+  @@index([userId, status])
+  @@map("bank_connections")
+}
+
+model BankAccount {
+  id                String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId            String            @db.Uuid
+  connectionId      String            @db.Uuid
+  providerAccountId String            @db.VarChar(255)
+  name              String?
+  iban              String?
+  currency          String            @db.VarChar(3)
+  accountType       String?           @db.VarChar(40)
+  balance           Decimal?          @db.Decimal(20, 8)
+  availableBalance  Decimal?          @db.Decimal(20, 8)
+  balanceUpdatedAt  DateTime?
+  createdAt         DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt         DateTime          @default(now()) @updatedAt @db.Timestamptz(6)
+  user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  connection        BankConnection    @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  transactions      BankTransaction[]
+
+  @@unique([connectionId, providerAccountId])
+  @@index([userId])
+  @@map("bank_accounts")
+}
+
+model BankTransaction {
+  id                    String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId                String      @db.Uuid
+  accountId             String      @db.Uuid
+  providerTransactionId String      @db.VarChar(255)
+  date                  DateTime    @db.Timestamptz(6)
+  amount                Decimal     @db.Decimal(20, 8)
+  currency              String      @db.VarChar(3)
+  description           String?
+  merchantName          String?
+  category              String?
+  direction             String      @db.VarChar(16)
+  status                String      @default("booked") @db.VarChar(24)
+  rawData               Json?
+  createdAt             DateTime    @default(now()) @db.Timestamptz(6)
+  updatedAt             DateTime    @updatedAt @db.Timestamptz(6)
+  user                  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account               BankAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  @@unique([accountId, providerTransactionId])
+  @@index([userId, date])
+  @@index([userId, category])
+  @@map("bank_transactions")
 }
 
 model NetWorthAsset {

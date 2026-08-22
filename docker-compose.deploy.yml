@@ -32,7 +32,14 @@ services:
       PEPPER: ${PEPPER}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
       EODHD_API_KEY: ${EODHD_API_KEY:-}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:8080,http://127.0.0.1:8080}
+      TRUELAYER_CLIENT_ID: ${TRUELAYER_CLIENT_ID:-}
+      TRUELAYER_CLIENT_SECRET: ${TRUELAYER_CLIENT_SECRET:-}
+      TRUELAYER_REDIRECT_URI: ${TRUELAYER_REDIRECT_URI:-https://finance.saulmoreno.es/api/bank-sync/truelayer/callback}
+      TRUELAYER_PROVIDER_ID: ${TRUELAYER_PROVIDER_ID:-}
+      TRUELAYER_AUTH_URL: ${TRUELAYER_AUTH_URL:-https://auth.truelayer.com}
+      TRUELAYER_API_URL: ${TRUELAYER_API_URL:-https://api.truelayer.com}
+      WEB_APP_URL: ${WEB_APP_URL:-https://finance.saulmoreno.es}
+      CORS_ORIGINS: ${CORS_ORIGINS:-https://finance.saulmoreno.es,http://localhost:8080,http://127.0.0.1:8080}
     volumes:
       - ./data/uploads:/app/uploads
     depends_on:
@@ -48,6 +55,22 @@ services:
         VITE_API_URL: /api
     restart: unless-stopped
     ports:
-      - "${WEB_PORT:-8080}:80"
+      - "${WEB_PORT:-127.0.0.1:8080}:80"
+    networks:
+      - default
+      - web
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=saulmoreno_web
+      - traefik.http.routers.finance.rule=Host(`finance.saulmoreno.es`)
+      - traefik.http.routers.finance.entrypoints=websecure
+      - traefik.http.routers.finance.tls=true
+      - traefik.http.routers.finance.tls.certresolver=letsencrypt
+      - traefik.http.services.finance.loadbalancer.server.port=80
     depends_on:
       - api
+
+networks:
+  web:
+    external: true
+    name: saulmoreno_web

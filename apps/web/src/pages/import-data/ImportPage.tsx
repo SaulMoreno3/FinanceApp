@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { FilePond } from 'react-filepond';
 import 'filepond/dist/filepond.min.css';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Clock } from 'lucide-react';
+import { CheckCircle2, Clock, Link2, Loader2, RefreshCw, Unlink } from 'lucide-react';
 
 // Import FilePond styles
 import { fetchAPI, postAPI } from '@/lib/api';
@@ -18,17 +18,30 @@ export default function ImportPage() {
 
     const [lastUpdatedMyInvestor, setLastUpdatedMyInvestor] = useState<string>("Loading...");
     const [lastUpdatedRevolut, setLastUpdatedRevolut] = useState<string>("Loading...");
+    const [bankStatus, setBankStatus] = useState<{
+        configured: boolean;
+        connected: boolean;
+        status: string;
+        lastSyncAt?: string | null;
+        lastError?: string | null;
+        accounts: Array<{ id: string; name: string | null; currency: string; balance: number | null }>;
+    }>({ configured: false, connected: false, status: 'DISCONNECTED', accounts: [] });
+    const [bankBusy, setBankBusy] = useState(false);
 
     useEffect(() => {
         const fetchStatus = async () => {
             try {
                 // Assuming endpoint exists as per user request
-                const data = await fetchAPI<{ myinvestor: string, revolut: string }>('/import/status');
+                const [data, connection] = await Promise.all([
+                    fetchAPI<{ myinvestor: string, revolut: string }>('/import/status'),
+                    fetchAPI<typeof bankStatus>('/bank-sync/status'),
+                ]);
                 // Assuming data format: { myinvestor: string, revolut: string }
                 // We can format the date here if needed, e.g., using date-fns or Intl.DateTimeFormat
                 // For now, assuming the backend sends a readable string or ISO date
                 setLastUpdatedMyInvestor(data.myinvestor ? new Date(data.myinvestor).toLocaleDateString() : "Never");
                 setLastUpdatedRevolut(data.revolut ? new Date(data.revolut).toLocaleDateString() : "Never");
+                setBankStatus(connection);
             } catch (error: unknown) {
                 console.error("Failed to fetch import status:", error);
                 setLastUpdatedMyInvestor("Error");
@@ -37,7 +50,52 @@ export default function ImportPage() {
         };
 
         fetchStatus();
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('truelayer') === 'connected') {
+            window.history.replaceState({}, '', '/import');
+        }
+        if (params.get('truelayer') === 'error') {
+            alert(`No se pudo conectar Revolut: ${params.get('message') ?? 'error desconocido'}`);
+            window.history.replaceState({}, '', '/import');
+        }
     }, []);
+
+    const connectBank = async () => {
+        setBankBusy(true);
+        try {
+            const { url } = await fetchAPI<{ url: string }>('/bank-sync/truelayer/connect');
+            window.location.assign(url);
+        } catch (error) {
+            alert(error instanceof Error ? error.message : 'No se pudo iniciar la conexión');
+            setBankBusy(false);
+        }
+    };
+
+    const syncBank = async () => {
+        setBankBusy(true);
+        try {
+            await postAPI('/bank-sync/sync', {});
+            const status = await fetchAPI<typeof bankStatus>('/bank-sync/status');
+            setBankStatus(status);
+        } catch (error) {
+            alert(error instanceof Error ? error.message : 'No se pudo sincronizar Revolut');
+        } finally {
+            setBankBusy(false);
+        }
+    };
+
+    const disconnectBank = async () => {
+        if (!window.confirm('¿Desconectar Revolut? Se borrarán los tokens de acceso, pero se conservarán los movimientos ya importados.')) return;
+        setBankBusy(true);
+        try {
+            await fetchAPI('/bank-sync/connection', { method: 'DELETE' });
+            setBankStatus({ configured: bankStatus.configured, connected: false, status: 'DISCONNECTED', accounts: [] });
+        } catch (error) {
+            alert(error instanceof Error ? error.message : 'No se pudo desconectar Revolut');
+        } finally {
+            setBankBusy(false);
+        }
+    };
 
     const handleUploadMyInvestor = async () => {
         if (myInvestorMovements.length === 0) {
@@ -95,6 +153,41 @@ export default function ImportPage() {
             </div>
 
             <div className="grid gap-6 md:grid-cols-2">
+                <Card className="md:col-span-2">
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2"><Link2 className="h-5 w-5" /> Conexión automática de Revolut</CardTitle>
+                        <CardDescription>Sincroniza cuentas, saldos y gastos una vez al día. La autorización se realiza en Revolut y no guardamos tus credenciales.</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {!bankStatus.configured ? (
+                            <p className="text-sm text-muted-foreground">La conexión aún no está configurada en el servidor.</p>
+                        ) : bankStatus.connected ? (
+                            <div className="space-y-4">
+                                <div className="flex flex-wrap items-center gap-3 text-sm">
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-3 py-1 text-emerald-500"><CheckCircle2 className="h-4 w-4" /> Conectada</span>
+                                    <span className="text-muted-foreground">Última sincronización: {bankStatus.lastSyncAt ? new Date(bankStatus.lastSyncAt).toLocaleString() : 'pendiente'}</span>
+                                </div>
+                                {bankStatus.accounts.length > 0 && <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                                    {bankStatus.accounts.map(account => <div key={account.id} className="rounded-lg border p-3">
+                                        <div className="text-sm font-medium">{account.name || 'Cuenta Revolut'}</div>
+                                        <div className="text-lg font-semibold">{account.balance === null ? '—' : `${account.balance.toLocaleString('es-ES', { minimumFractionDigits: 2 })} ${account.currency}`}</div>
+                                    </div>)}
+                                </div>}
+                                {bankStatus.lastError && <p className="text-sm text-destructive">{bankStatus.lastError}</p>}
+                                <div className="flex flex-wrap gap-2">
+                                    <button onClick={syncBank} disabled={bankBusy} className="inline-flex h-9 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50"><RefreshCw className="h-4 w-4" /> Sincronizar ahora</button>
+                                    <button onClick={disconnectBank} disabled={bankBusy} className="inline-flex h-9 items-center gap-2 rounded-md border px-4 text-sm font-medium disabled:opacity-50"><Unlink className="h-4 w-4" /> Desconectar</button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="flex flex-wrap items-center justify-between gap-4">
+                                <p className="text-sm text-muted-foreground">Conecta Revolut para importar automáticamente tus gastos y saldos.</p>
+                                <button onClick={connectBank} disabled={bankBusy} className="inline-flex h-10 items-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50">{bankBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Link2 className="h-4 w-4" />} Conectar Revolut</button>
+                            </div>
+                        )}
+                    </CardContent>
+                </Card>
+
                 {/* MyInvestor Section */}
                 <Card className="flex flex-col h-full">
                     <CardHeader>
