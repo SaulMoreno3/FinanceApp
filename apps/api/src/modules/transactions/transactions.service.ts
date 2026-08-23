@@ -63,6 +63,7 @@ export class TransactionsService {
 
     async findPendingConversions(userId: string) {
         await this.inferCashTransferConversions(userId);
+        await this.inferTradeConversionsFromNearestCashRate(userId);
 
         const [transfers, trades] = await Promise.all([
             prisma.cashTransfer.findMany({
@@ -144,6 +145,44 @@ export class TransactionsService {
                 data: { eurCost: Math.abs(Number(transfer.value)) * conversionRate, conversionRate },
             })));
             candidates.forEach(candidate => usedBankTransactionIds.add(candidate.id));
+        }
+    }
+
+    private async inferTradeConversionsFromNearestCashRate(userId: string) {
+        const [rates, trades] = await Promise.all([
+            prisma.cashTransfer.findMany({
+                where: {
+                    userId,
+                    currency: { not: Currency.EUR },
+                    type: { in: ['Cash top-up', 'Cash withdrawal'] },
+                    conversionRate: { not: null },
+                    skippedConversion: false,
+                },
+                select: { date: true, currency: true, conversionRate: true },
+                orderBy: { date: 'asc' },
+            }),
+            prisma.stockTrade.findMany({
+                where: { userId, currency: { not: Currency.EUR }, conversionRate: null },
+                select: { id: true, date: true, currency: true, value: true },
+                orderBy: { date: 'asc' },
+            }),
+        ]);
+
+        for (const trade of trades) {
+            const candidates = rates
+                .filter(rate => rate.currency === trade.currency && rate.conversionRate)
+                .map(rate => ({
+                    rate: Number(rate.conversionRate),
+                    distance: Math.abs(rate.date.getTime() - trade.date.getTime()),
+                }))
+                .sort((left, right) => left.distance - right.distance);
+            const nearest = candidates[0];
+            if (!nearest || nearest.distance > 90 * 24 * 60 * 60 * 1000) continue;
+            const eurValue = Math.abs(Number(trade.value)) * nearest.rate;
+            await prisma.stockTrade.update({
+                where: { id: trade.id },
+                data: { eurCost: eurValue, eurValue, conversionRate: nearest.rate },
+            });
         }
     }
 
