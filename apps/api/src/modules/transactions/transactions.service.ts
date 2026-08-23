@@ -102,16 +102,30 @@ export class TransactionsService {
             orderBy: { date: 'asc' },
         });
 
+        const groups: typeof transfers[] = [];
         for (const transfer of transfers) {
-            const from = new Date(transfer.date.getTime() - 15 * 60 * 1000);
-            const to = new Date(transfer.date.getTime() + 15 * 60 * 1000);
-            const expectedBankSign = transfer.type === 'Cash top-up' ? 'out' : 'in';
+            const previousGroup = groups.at(-1);
+            const previous = previousGroup?.at(-1);
+            if (previousGroup && previous && previous.type === transfer.type && transfer.date.getTime() - previous.date.getTime() <= 15 * 60 * 1000) {
+                previousGroup.push(transfer);
+            } else {
+                groups.push([transfer]);
+            }
+        }
+
+        const usedBankTransactionIds = new Set<string>();
+        for (const group of groups) {
+            const from = new Date(group[0].date.getTime() - 15 * 60 * 1000);
+            const to = new Date(group.at(-1)!.date.getTime() + 15 * 60 * 1000);
+            const transferAmount = group.reduce((sum, transfer) => sum + Math.abs(Number(transfer.value)), 0);
+            const expectedBankSign = group[0].type === 'Cash top-up' ? 'out' : 'in';
             const candidates = await prisma.bankTransaction.findMany({
                 where: {
                     userId,
                     currency: Currency.EUR,
                     date: { gte: from, lte: to },
                     amount: expectedBankSign === 'out' ? { lt: 0 } : { gt: 0 },
+                    id: { notIn: [...usedBankTransactionIds] },
                     OR: [
                         { description: { contains: 'investment', mode: 'insensitive' } },
                         { merchantName: { contains: 'investment', mode: 'insensitive' } },
@@ -120,18 +134,16 @@ export class TransactionsService {
                 select: { id: true, date: true, amount: true },
                 orderBy: { date: 'asc' },
             });
-            if (candidates.length !== 1) continue;
+            if (!candidates.length) continue;
 
-            const bankAmount = Math.abs(Number(candidates[0].amount));
-            const transferAmount = Math.abs(Number(transfer.value));
+            const bankAmount = candidates.reduce((sum, candidate) => sum + Math.abs(Number(candidate.amount)), 0);
             if (!Number.isFinite(bankAmount) || !Number.isFinite(transferAmount) || transferAmount === 0) continue;
-            await prisma.cashTransfer.update({
+            const conversionRate = bankAmount / transferAmount;
+            await prisma.$transaction(group.map(transfer => prisma.cashTransfer.update({
                 where: { id: transfer.id },
-                data: {
-                    eurCost: bankAmount,
-                    conversionRate: bankAmount / transferAmount,
-                },
-            });
+                data: { eurCost: Math.abs(Number(transfer.value)) * conversionRate, conversionRate },
+            })));
+            candidates.forEach(candidate => usedBankTransactionIds.add(candidate.id));
         }
     }
 
