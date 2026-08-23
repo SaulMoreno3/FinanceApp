@@ -62,6 +62,8 @@ export class TransactionsService {
     }
 
     async findPendingConversions(userId: string) {
+        await this.inferCashTransferConversions(userId);
+
         const [transfers, trades] = await Promise.all([
             prisma.cashTransfer.findMany({
                 where: {
@@ -85,6 +87,52 @@ export class TransactionsService {
             ...transfers.map(transfer => ({ ...transfer, entity: 'cash' as const, value: Number(transfer.value) })),
             ...trades.map(trade => ({ ...trade, entity: 'trade' as const, value: Number(trade.value) })),
         ].sort((left, right) => right.date.getTime() - left.date.getTime());
+    }
+
+    private async inferCashTransferConversions(userId: string) {
+        const transfers = await prisma.cashTransfer.findMany({
+            where: {
+                userId,
+                type: { in: ['Cash top-up', 'Cash withdrawal'] },
+                currency: { not: Currency.EUR },
+                conversionRate: null,
+                skippedConversion: false,
+            },
+            select: { id: true, date: true, type: true, value: true },
+            orderBy: { date: 'asc' },
+        });
+
+        for (const transfer of transfers) {
+            const from = new Date(transfer.date.getTime() - 15 * 60 * 1000);
+            const to = new Date(transfer.date.getTime() + 15 * 60 * 1000);
+            const expectedBankSign = transfer.type === 'Cash top-up' ? 'out' : 'in';
+            const candidates = await prisma.bankTransaction.findMany({
+                where: {
+                    userId,
+                    currency: Currency.EUR,
+                    date: { gte: from, lte: to },
+                    amount: expectedBankSign === 'out' ? { lt: 0 } : { gt: 0 },
+                    OR: [
+                        { description: { contains: 'investment', mode: 'insensitive' } },
+                        { merchantName: { contains: 'investment', mode: 'insensitive' } },
+                    ],
+                },
+                select: { id: true, date: true, amount: true },
+                orderBy: { date: 'asc' },
+            });
+            if (candidates.length !== 1) continue;
+
+            const bankAmount = Math.abs(Number(candidates[0].amount));
+            const transferAmount = Math.abs(Number(transfer.value));
+            if (!Number.isFinite(bankAmount) || !Number.isFinite(transferAmount) || transferAmount === 0) continue;
+            await prisma.cashTransfer.update({
+                where: { id: transfer.id },
+                data: {
+                    eurCost: bankAmount,
+                    conversionRate: bankAmount / transferAmount,
+                },
+            });
+        }
     }
 
     async updateTransactionConversion(userId: string, id: string, eurCost: number) {
