@@ -1,7 +1,10 @@
+import { FLEXIBLE_FUNDS_OPENING_BALANCE, isNonSpendingTransfer } from './bank-transfer';
 import crypto from 'node:crypto';
 import jwt from 'jsonwebtoken';
 import { prisma } from '../../common/db/prisma';
 import { decrypt, encrypt } from '../../common/utils/encryption';
+import { debtsService } from '../debts/debts.service';
+import { expensesService } from '../expenses/expenses.service';
 
 const PROVIDER = 'truelayer';
 const AUTH_URL = process.env.TRUELAYER_AUTH_URL ?? 'https://auth.truelayer.com';
@@ -47,6 +50,29 @@ const required = (name: string) => {
 
 const hashState = (state: string) => crypto.createHash('sha256').update(state).digest('hex');
 
+const expenseCategory = (category: string | null | undefined, merchantName: string | null | undefined, description: string | null | undefined) => {
+    const haystack = `${merchantName ?? ''} ${description ?? ''}`.toLocaleLowerCase('es-ES');
+    if (/mcdonald|burger|restaurant|restaurante|bar |cafe |cafeter|deliveroo|just eat|ubereats|glovo|carrefour express/.test(haystack)) return 'Restaurantes';
+    if (/albert heijn|jumbo|tesco|lidl|aldi|mercadona|carrefour|supermarket|supermercado/.test(haystack)) return 'Supermercado';
+    if (/flixbus|uber|bolt|renfe|metro|bus |train|tren|taxi|aeropuerto|airport/.test(haystack)) return 'Transporte';
+    if (/amazon|paypal|ebay|aliexpress|etsy|zalando/.test(haystack)) return 'Compras online';
+    if (/netflix|spotify|disney|prime video|apple\.com|google\*/.test(haystack)) return 'Suscripciones';
+    return category || 'Sin categoría';
+};
+
+const FLEXIBLE_FUNDS_NAME = 'Flexible Monetary Funds';
+// TrueLayer does not expose this Revolut product as an account. This is the
+// opening balance before the first imported movement, calibrated to the
+// current balance supplied by the user; subsequent balance changes come only
+// from the matched transfers.
+const flexibleFundsWhere = {
+    OR: [
+        { description: { contains: 'Fondos Monetarios Flexibles', mode: 'insensitive' as const } },
+        { description: { contains: 'Savings Vault topup', mode: 'insensitive' as const } },
+        { description: { contains: 'Cuenta flexible', mode: 'insensitive' as const } },
+    ],
+};
+
 const parseError = async (response: Response) => {
     const body = await response.text();
     return body.slice(0, 500) || `${response.status} ${response.statusText}`;
@@ -57,7 +83,7 @@ export class TrueLayerService {
         return Boolean(process.env.TRUELAYER_CLIENT_ID && process.env.TRUELAYER_CLIENT_SECRET);
     }
 
-    async createConnectionUrl(userId: string) {
+    async createConnectionUrl(userId: string, includeCards = false) {
         const clientId = required('TRUELAYER_CLIENT_ID');
         const redirectUri = process.env.TRUELAYER_REDIRECT_URI
             ?? `${FRONTEND_URL.replace(/\/$/, '')}/api/bank-sync/truelayer/callback`;
@@ -67,13 +93,13 @@ export class TrueLayerService {
         await prisma.bankConnection.upsert({
             where: { userId_provider: { userId, provider: PROVIDER } },
             create: { userId, provider: PROVIDER, status: 'PENDING', oauthStateHash: hashState(state), lastError: null },
-            update: { status: 'PENDING', oauthStateHash: hashState(state), lastError: null },
+            update: { oauthStateHash: hashState(state), lastError: null },
         });
 
         const params = new URLSearchParams({
             response_type: 'code',
             client_id: clientId,
-            scope: SCOPES,
+            scope: includeCards ? `${SCOPES} cards` : SCOPES,
             redirect_uri: redirectUri,
             state,
         });
@@ -196,7 +222,7 @@ export class TrueLayerService {
         const url = new URL(`${API_URL}${path}`);
         Object.entries(params ?? {}).forEach(([key, value]) => url.searchParams.set(key, value));
         const response = await fetch(url, { headers: { Authorization: `Bearer ${accessToken}` } });
-        if (!response.ok) throw new Error(`TrueLayer request failed: ${await parseError(response)}`);
+        if (!response.ok) throw Object.assign(new Error(`TrueLayer request failed: ${await parseError(response)}`), {providerStatus:response.status});
         return response.json() as Promise<T>;
     }
 
@@ -271,7 +297,10 @@ export class TrueLayerService {
             }
 
             await prisma.bankConnection.update({ where: { id: connectionId }, data: { lastSyncAt: new Date(), lastError: null, status: 'CONNECTED' } });
-            return { accountsCount, transactionsCount, syncedAt: new Date().toISOString() };
+            const debtReconciliation = await debtsService.reconcileUser(userId);
+            const cardSync = await expensesService.syncProviderCards(userId, connectionId, path => this.api<any>(accessToken,path));
+            await expensesService.reconcile(userId);
+            return { accountsCount, transactionsCount, debtReconciliation, cardSync, syncedAt: new Date().toISOString() };
         } catch (error: any) {
             await prisma.bankConnection.update({ where: { id: connectionId }, data: { status: error.statusCode === 401 ? 'REAUTH_REQUIRED' : 'ERROR', lastError: error.message?.slice(0, 500) } }).catch(() => undefined);
             throw error;
@@ -310,37 +339,74 @@ export class TrueLayerService {
             include: { accounts: { select: { id: true, name: true, currency: true, balance: true, availableBalance: true, balanceUpdatedAt: true } } },
         });
         if (!connection) return { configured: this.isConfigured, connected: false, status: 'DISCONNECTED', accounts: [] };
+        const flexibleFunds = await prisma.bankTransaction.aggregate({
+            // Keep the reconciled current balance based on the current
+            // TrueLayer label. Legacy labels are included in the history
+            // view below, but their old records are not reliable enough to
+            // alter the reconciled balance automatically.
+            where: { userId, description: { contains: 'Fondos Monetarios Flexibles', mode: 'insensitive' } },
+            _sum: { amount: true },
+        });
+        // Bank movements are signed from the main account's perspective:
+        // money sent to the fund is negative there and money returned is
+        // positive. Reverse that sign for the fund's own balance.
+        const flexibleFundsBalance = FLEXIBLE_FUNDS_OPENING_BALANCE - Number(flexibleFunds._sum.amount ?? 0);
+
         return {
             configured: this.isConfigured,
             connected: connection.status === 'CONNECTED', status: connection.status,
             lastSyncAt: connection.lastSyncAt, lastError: connection.lastError,
-            accounts: connection.accounts.map(account => ({ ...account, balance: account.balance ? Number(account.balance) : null, availableBalance: account.availableBalance ? Number(account.availableBalance) : null })),
+            accounts: [
+                ...connection.accounts.map(account => ({ ...account, balance: account.balance ? Number(account.balance) : null, availableBalance: account.availableBalance ? Number(account.availableBalance) : null, calculated: false })),
+                {
+                    id: 'calculated-flexible-monetary-funds',
+                    name: FLEXIBLE_FUNDS_NAME,
+                    currency: 'EUR',
+                    balance: flexibleFundsBalance,
+                    availableBalance: null,
+                    calculated: true,
+                },
+            ],
         };
     }
 
-    async getOverview(userId: string) {
+    async getOverview(userId: string, month?: string) {
         const status = await this.getStatus(userId);
-        const monthStart = new Date();
-        monthStart.setDate(1);
-        monthStart.setHours(0, 0, 0, 0);
-        const [recent, monthRows] = await Promise.all([
-            prisma.bankTransaction.findMany({ where: { userId }, orderBy: { date: 'desc' }, take: 8, include: { account: { select: { name: true, currency: true } } } }),
-            prisma.bankTransaction.findMany({ where: { userId, date: { gte: monthStart } }, select: { amount: true, category: true, currency: true } }),
+        const selectedMonth = month ?? new Date().toISOString().slice(0, 7);
+        const [year, monthNumber] = selectedMonth.split('-').map(Number);
+        const monthStart = new Date(Date.UTC(year, monthNumber - 1, 1));
+        const monthEnd = new Date(Date.UTC(year, monthNumber, 1));
+        const date = { gte: monthStart, lt: monthEnd };
+        const [recent, monthRows, oldest] = await Promise.all([
+            prisma.bankTransaction.findMany({ where: { userId, date }, orderBy: { date: 'desc' }, take: 8, include: { account: { select: { name: true, currency: true } } } }),
+            prisma.bankTransaction.findMany({ where: { userId, date }, select: { amount: true, category: true, currency: true, merchantName: true, description: true } }),
+            prisma.bankTransaction.findFirst({ where: { userId }, orderBy: { date: 'asc' }, select: { date: true } }),
         ]);
         const byCurrency = new Map<string, { income: number; expenses: number }>();
         const byCategory = new Map<string, number>();
         for (const row of monthRows) {
-            const category = row.category || 'Sin categoría';
+            // Transfers to/from the calculated money-market account are
+            // movements between the user's own accounts, not income or
+            // spending. They are represented by the virtual account above.
+            if (isNonSpendingTransfer(row.description)) continue;
+            const category = expenseCategory(row.category, row.merchantName, row.description);
             const currency = row.currency || 'EUR';
             const current = byCurrency.get(currency) ?? { income: 0, expenses: 0 };
             if (Number(row.amount) >= 0) current.income += Number(row.amount);
             else current.expenses += Math.abs(Number(row.amount));
             byCurrency.set(currency, current);
-            const categoryKey = `${category}|||${currency}`;
-            byCategory.set(categoryKey, (byCategory.get(categoryKey) ?? 0) + Math.abs(Number(row.amount)));
+            // The category card is explicitly an expenses view. Credits and
+            // other positive movements belong in the income totals, never in
+            // the expense breakdown.
+            if (Number(row.amount) < 0) {
+                const categoryKey = `${category}|||${currency}`;
+                byCategory.set(categoryKey, (byCategory.get(categoryKey) ?? 0) + Math.abs(Number(row.amount)));
+            }
         }
         return {
             ...status,
+            selectedMonth,
+            firstMonth: oldest?.date.toISOString().slice(0, 7) ?? selectedMonth,
             month: {
                 byCurrency: [...byCurrency.entries()].map(([currency, values]) => ({ currency, ...values, net: values.income - values.expenses })),
                 byCategory: [...byCategory.entries()].map(([key, amount]) => { const [category, currency] = key.split('|||'); return { category, currency, amount }; }).sort((a, b) => b.amount - a.amount),
@@ -353,12 +419,58 @@ export class TrueLayerService {
         };
     }
 
+    async getBalanceHistory(userId: string) {
+        const status = await this.getStatus(userId);
+        const connection = await prisma.bankConnection.findUnique({
+            where: { userId_provider: { userId, provider: PROVIDER } },
+            include: { accounts: { select: { id: true, name: true, currency: true, balance: true } } },
+        });
+        if (!connection) return { accounts: [], monthly: [], yearly: [], global: 0 };
+
+        const realAccountIds = connection.accounts.map((account) => account.id);
+        const rows = await prisma.bankTransaction.findMany({
+            where: { userId, accountId: { in: realAccountIds } },
+            select: { accountId: true, date: true, amount: true },
+            orderBy: { date: 'asc' },
+        });
+        const fundRows = await prisma.bankTransaction.findMany({
+            where: { userId, description: { contains: 'Fondos Monetarios Flexibles', mode: 'insensitive' } },
+            select: { date: true, amount: true },
+            orderBy: { date: 'asc' },
+        });
+        const accounts = [
+            ...connection.accounts.map((account) => ({ id: account.id, name: account.name || 'Cuenta bancaria', currency: account.currency, currentBalance: Number(account.balance ?? 0) })),
+            { id: 'calculated-flexible-monetary-funds', name: FLEXIBLE_FUNDS_NAME, currency: 'EUR', currentBalance: Number(status.accounts.find((account: any) => account.id === 'calculated-flexible-monetary-funds')?.balance ?? 0) },
+        ];
+        const firstDate = rows[0]?.date ?? new Date();
+        const firstMonth = new Date(firstDate.getFullYear(), firstDate.getMonth(), 1);
+        const lastMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+        const monthKeys: string[] = [];
+        for (const cursor = new Date(firstMonth); cursor <= lastMonth; cursor.setMonth(cursor.getMonth() + 1)) monthKeys.push(`${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`);
+        const monthly = monthKeys.map((key) => {
+            const end = new Date(`${key}-01T00:00:00.000Z`); end.setUTCMonth(end.getUTCMonth() + 1);
+            const balances: Record<string, number | null> = {};
+            for (const account of accounts) {
+                if (account.id === 'calculated-flexible-monetary-funds') {
+                    balances[account.id] = end <= new Date('2024-08-20T00:00:00Z') ? null : account.currentBalance - fundRows.filter((row) => row.date >= end).reduce((sum, row) => sum + Number(row.amount), 0);
+                } else {
+                    balances[account.id] = account.currentBalance - rows.filter((row) => row.accountId === account.id && row.date >= end).reduce((sum, row) => sum + Number(row.amount), 0);
+                }
+            }
+            return { period: key, balances, total: Object.values(balances).reduce((sum: number, value) => sum + Number(value ?? 0), 0) };
+        });
+        const yearlyMap = new Map<string, typeof monthly[number]>();
+        for (const point of monthly) yearlyMap.set(point.period.slice(0, 4), point);
+        return { accounts, monthly, yearly: [...yearlyMap.entries()].map(([period, point]) => ({ ...point, period })), global: accounts.reduce((sum, account) => sum + account.currentBalance, 0) };
+    }
+
     async getTransactions(userId: string, query: { page?: number; limit?: number; accountId?: string; category?: string; from?: string; to?: string }) {
         const page = Math.max(1, query.page ?? 1);
         const limit = Math.min(100, Math.max(1, query.limit ?? 50));
+        const isFlexibleFunds = query.accountId === 'calculated-flexible-monetary-funds';
         const where: any = {
             userId,
-            ...(query.accountId ? { accountId: query.accountId } : {}),
+            ...(isFlexibleFunds ? flexibleFundsWhere : query.accountId ? { accountId: query.accountId } : {}),
             ...(query.category ? { category: query.category } : {}),
             ...(query.from || query.to ? { date: { ...(query.from ? { gte: new Date(query.from) } : {}), ...(query.to ? { lte: new Date(query.to) } : {}) } } : {}),
         };
@@ -367,7 +479,25 @@ export class TrueLayerService {
             prisma.bankTransaction.count({ where }),
         ]);
         return {
-            data: transactions.map(transaction => ({ ...transaction, amount: Number(transaction.amount), rawData: undefined })),
+            data: transactions.map(transaction => ({
+                ...transaction,
+                // TrueLayer stores the movement from the principal account's
+                // perspective. Reverse it in the fund view.
+                amount: isFlexibleFunds ? -Number(transaction.amount) : Number(transaction.amount),
+                rawData: undefined,
+                ...(isFlexibleFunds ? { account: { name: FLEXIBLE_FUNDS_NAME, currency: 'EUR' } } : {}),
+            })),
+            ...(isFlexibleFunds ? {
+                // The history includes legacy labels for completeness, but
+                // the displayed balance remains the reconciled current
+                // balance and must not be recalculated from those legacy rows.
+                balance: FLEXIBLE_FUNDS_OPENING_BALANCE - Number((await prisma.bankTransaction.aggregate({
+                    where: { userId, description: { contains: 'Fondos Monetarios Flexibles', mode: 'insensitive' } },
+                    _sum: { amount: true },
+                }))._sum.amount ?? 0),
+                accountName: FLEXIBLE_FUNDS_NAME,
+                accountCurrency: 'EUR',
+            } : {}),
             meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
         };
     }

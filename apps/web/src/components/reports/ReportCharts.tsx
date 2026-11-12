@@ -19,16 +19,8 @@ import type { CategoryBreakdown } from "@/components/net-worth/net-worth.types";
 import type { Holding } from "@/components/portfolio/portfolio.types";
 import type { SalaryRecord } from "@/components/salary/salary.types";
 
-const COLORS = ["#7c3aed", "#2563eb", "#06b6d4", "#10b981", "#f59e0b", "#f43f5e", "#ec4899"];
-const chartTextColor = "hsl(var(--muted-foreground))";
-const chartGridColor = "hsl(var(--border))";
-const chartTooltipStyle = {
-    backgroundColor: "hsl(var(--popover))",
-    border: "1px solid hsl(var(--border))",
-    borderRadius: "12px",
-    boxShadow: "0 18px 50px -22px rgba(0, 0, 0, 0.7)",
-    color: "hsl(var(--popover-foreground))",
-};
+import { chartTextColor, chartGridColor, chartTooltipStyle, chartTooltipTextStyle, holdingCostEur } from "./report-data";
+const COLORS = ["#5b8db8", "#70a89a", "#9c90bb", "#c39968", "#b77e87", "#7aa6b0", "#999ca6"];
 
 const currency = new Intl.NumberFormat("en-GB", {
     style: "currency",
@@ -70,14 +62,13 @@ function ChartShell({
     className?: string;
 }) {
     return (
-        <Card className={`relative overflow-hidden border-border/70 bg-card/80 shadow-sm ${className}`}>
-            <div className="pointer-events-none absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-primary/[0.08] to-transparent" />
+        <Card className={`overflow-hidden border-border bg-card shadow-none ${className}`}>
             <CardHeader className="relative flex-row items-start justify-between space-y-0 pb-3">
                 <div className="space-y-1.5">
                     <CardTitle className="text-base">{title}</CardTitle>
                     <CardDescription>{description}</CardDescription>
                 </div>
-                <div className="rounded-xl border border-primary/15 bg-primary/10 p-2.5 text-primary">
+                <div className="p-1 text-muted-foreground">
                     <Icon className="h-4 w-4" />
                 </div>
             </CardHeader>
@@ -88,7 +79,7 @@ function ChartShell({
 
 export function AssetAllocationChart({ categories }: { categories: CategoryBreakdown[] }) {
     const chartData = categories
-        .filter((category) => category.totalValue > 0)
+        .filter((category) => category.currency === "EUR" && category.totalValue > 0)
         .sort((left, right) => right.totalValue - left.totalValue)
         .map((category) => ({
             name: category.category,
@@ -98,7 +89,7 @@ export function AssetAllocationChart({ categories }: { categories: CategoryBreak
     const total = chartData.reduce((sum, category) => sum + category.value, 0);
 
     return (
-        <ChartShell title="Asset allocation" description="How your net worth is distributed" icon={Layers3}>
+        <ChartShell title="Asset allocation" description="Positive asset valuations in EUR · excludes liabilities and other currencies" icon={Layers3}>
             {chartData.length === 0 ? <EmptyChart message="No net worth data" /> : (
                 <div className="grid min-h-[300px] items-center gap-4 sm:grid-cols-[minmax(220px,0.9fr)_1.1fr]">
                     <div className="relative mx-auto h-[250px] w-full max-w-[280px]">
@@ -120,7 +111,7 @@ export function AssetAllocationChart({ categories }: { categories: CategoryBreak
                                         <Cell key={entry.name} fill={COLORS[index % COLORS.length]} />
                                     ))}
                                 </Pie>
-                                <Tooltip formatter={(value) => formatCurrency(Number(value))} contentStyle={chartTooltipStyle} />
+                                <Tooltip formatter={(value) => formatCurrency(Number(value))} contentStyle={chartTooltipStyle} labelStyle={chartTooltipTextStyle} itemStyle={chartTooltipTextStyle} />
                             </PieChart>
                         </ResponsiveContainer>
                         <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
@@ -130,11 +121,11 @@ export function AssetAllocationChart({ categories }: { categories: CategoryBreak
                         </div>
                     </div>
                     <div className="space-y-2.5">
-                        {chartData.slice(0, 6).map((item, index) => {
+                        {chartData.map((item, index) => {
                             const percentage = total > 0 ? (item.value / total) * 100 : 0;
                             return (
                                 <div key={item.name} className="group flex items-center gap-3 rounded-xl border border-transparent px-3 py-2 transition-colors hover:border-border/70 hover:bg-muted/30">
-                                    <span className="h-2.5 w-2.5 shrink-0 rounded-full shadow-[0_0_12px_currentColor]" style={{ backgroundColor: COLORS[index % COLORS.length], color: COLORS[index % COLORS.length] }} />
+                                    <span className="h-2.5 w-2.5 shrink-0 rounded-full " style={{ backgroundColor: COLORS[index % COLORS.length], color: COLORS[index % COLORS.length] }} />
                                     <div className="min-w-0 flex-1">
                                         <div className="flex items-center justify-between gap-3 text-sm">
                                             <span className="truncate font-medium">{item.name}</span>
@@ -158,37 +149,31 @@ export function AssetAllocationChart({ categories }: { categories: CategoryBreak
 export function PortfolioExposureChart({ holdings }: { holdings: Holding[] }) {
     const openHoldings = holdings
         .filter((holding) => holding.remainingShares > 0)
-        .sort((left, right) => right.totalCostBasis - left.totalCostBasis);
-    const total = openHoldings.reduce((sum, holding) => sum + holding.totalCostBasis, 0);
+        .sort((left, right) => (holdingCostEur(right) ?? 0) - (holdingCostEur(left) ?? 0));
+    const total = openHoldings.reduce((sum, holding) => sum + (holdingCostEur(holding) ?? 0), 0);
     const chartData = openHoldings.slice(0, 8).map((holding) => {
         const label = holding.name || holding.symbol;
         return {
             symbol: label.length > 18 ? `${label.slice(0, 18)}…` : label,
-            cost: holding.totalCostBasis,
-            weight: total > 0 ? (holding.totalCostBasis / total) * 100 : 0,
+            cost: holdingCostEur(holding),
+            weight: total > 0 ? ((holdingCostEur(holding) ?? 0) / total) * 100 : 0,
         };
     });
 
     return (
         <ChartShell title="Portfolio exposure" description="Largest open positions by cost basis" icon={ArrowUpRight}>
-            {chartData.length === 0 ? <EmptyChart message="No open positions" /> : (
+            {openHoldings.some((holding) => holdingCostEur(holding) === null) ? <EmptyChart message="Historical EUR conversions are missing. Exposure is unavailable." /> : chartData.length === 0 ? <EmptyChart message="No open positions" /> : (
                 <ResponsiveContainer width="100%" height={300}>
                     <BarChart data={chartData} layout="vertical" margin={{ top: 4, right: 20, left: 12, bottom: 4 }}>
-                        <defs>
-                            <linearGradient id="exposureBar" x1="0" y1="0" x2="1" y2="0">
-                                <stop offset="0%" stopColor="#7c3aed" />
-                                <stop offset="100%" stopColor="#2563eb" />
-                            </linearGradient>
-                        </defs>
                         <CartesianGrid stroke={chartGridColor} strokeDasharray="4 8" horizontal={false} />
                         <XAxis type="number" tick={{ fill: chartTextColor, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(value) => compactCurrency.format(value)} />
                         <YAxis type="category" dataKey="symbol" width={126} tick={{ fill: chartTextColor, fontSize: 11 }} axisLine={false} tickLine={false} />
                         <Tooltip
                             formatter={(value, name) => name === "Cost basis" ? formatCurrency(Number(value)) : `${Number(value).toFixed(1)}%`}
-                            contentStyle={chartTooltipStyle}
-                            cursor={{ fill: "hsl(var(--muted) / 0.3)" }}
+                            contentStyle={chartTooltipStyle} labelStyle={chartTooltipTextStyle} itemStyle={chartTooltipTextStyle}
+                            cursor={{ fill: "var(--muted)" }}
                         />
-                        <Bar dataKey="cost" name="Cost basis" fill="url(#exposureBar)" radius={[0, 8, 8, 0]} barSize={17} />
+                        <Bar dataKey="cost" name="Cost basis" fill="#5b8db8" radius={[0, 3, 3, 0]} barSize={17} />
                     </BarChart>
                 </ResponsiveContainer>
             )}
@@ -202,10 +187,10 @@ export function SalaryTrendChart({ salaries }: { salaries: SalaryRecord[] }) {
 
     for (const salary of salaries) {
         const date = new Date(salary.date);
-        if (Number.isNaN(date.getTime()) || date.getFullYear() !== currentYear) continue;
-        const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+        if (Number.isNaN(date.getTime()) || date.getUTCFullYear() !== currentYear) continue;
+        const key = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}`;
         const current = monthly.get(key) ?? {
-            month: date.toLocaleDateString("en-GB", { month: "short" }),
+            month: date.toLocaleDateString("en-GB", { month: "short", timeZone: "UTC" }),
             gross: 0,
             net: 0,
         };
@@ -224,20 +209,20 @@ export function SalaryTrendChart({ salaries }: { salaries: SalaryRecord[] }) {
     const totalNet = chartData.reduce((sum, item) => sum + item.net, 0);
 
     return (
-        <ChartShell title="Income momentum" description={`Gross and net monthly income · ${currentYear}`} icon={CircleDollarSign} className="lg:col-span-2">
+        <ChartShell title="Monthly income" description={`Gross and net monthly income · ${currentYear}`} icon={CircleDollarSign} className="lg:col-span-2">
             {chartData.length === 0 ? <EmptyChart message="No salaries for the current year" /> : (
                 <>
-                    <div className="mb-5 flex flex-wrap gap-3">
-                        <div className="rounded-xl border border-violet-500/15 bg-violet-500/10 px-4 py-2.5">
-                            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-violet-400">Gross YTD</p>
+                    <div className="mb-5 flex flex-wrap gap-8">
+                        <div className="px-1 py-2">
+                            <p className="text-xs text-muted-foreground">Gross YTD</p>
                             <p className="mt-1 text-lg font-bold">{formatCurrency(totalGross)}</p>
                         </div>
-                        <div className="rounded-xl border border-emerald-500/15 bg-emerald-500/10 px-4 py-2.5">
-                            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-400">Net YTD</p>
+                        <div className="px-1 py-2">
+                            <p className="text-xs text-muted-foreground">Net YTD</p>
                             <p className="mt-1 text-lg font-bold">{formatCurrency(totalNet)}</p>
                         </div>
-                        <div className="rounded-xl border border-border/70 bg-muted/25 px-4 py-2.5">
-                            <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">Average net</p>
+                        <div className="px-1 py-2">
+                            <p className="text-xs text-muted-foreground">Average net</p>
                             <p className="mt-1 text-lg font-bold">{formatCurrency(averageNet)}</p>
                         </div>
                     </div>
@@ -245,26 +230,26 @@ export function SalaryTrendChart({ salaries }: { salaries: SalaryRecord[] }) {
                         <AreaChart data={chartData} margin={{ top: 12, right: 8, left: 8, bottom: 2 }}>
                             <defs>
                                 <linearGradient id="grossSalary" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor="#8b5cf6" stopOpacity={0.38} />
-                                    <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0} />
+                                    <stop offset="0%" stopColor="#5b8db8" stopOpacity={0.12} />
+                                    <stop offset="100%" stopColor="#5b8db8" stopOpacity={0} />
                                 </linearGradient>
                                 <linearGradient id="netSalary" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor="#10b981" stopOpacity={0.34} />
-                                    <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
+                                    <stop offset="0%" stopColor="#70a89a" stopOpacity={0.12} />
+                                    <stop offset="100%" stopColor="#70a89a" stopOpacity={0} />
                                 </linearGradient>
                             </defs>
                             <CartesianGrid stroke={chartGridColor} strokeDasharray="4 8" vertical={false} />
                             <XAxis dataKey="month" tick={{ fill: chartTextColor, fontSize: 11 }} axisLine={false} tickLine={false} />
                             <YAxis tick={{ fill: chartTextColor, fontSize: 11 }} axisLine={false} tickLine={false} tickFormatter={(value) => compactCurrency.format(value)} />
-                            <Tooltip formatter={(value) => formatCurrency(Number(value))} contentStyle={chartTooltipStyle} cursor={{ stroke: "hsl(var(--primary))", strokeOpacity: 0.3 }} />
-                            <ReferenceLine y={averageNet} stroke="#10b981" strokeDasharray="5 5" strokeOpacity={0.45} />
-                            <Area type="monotone" dataKey="gross" name="Gross" stroke="#8b5cf6" fill="url(#grossSalary)" strokeWidth={2.5} activeDot={{ r: 5, strokeWidth: 0 }} />
-                            <Area type="monotone" dataKey="net" name="Net" stroke="#10b981" fill="url(#netSalary)" strokeWidth={2.5} activeDot={{ r: 5, strokeWidth: 0 }} />
+                            <Tooltip formatter={(value) => formatCurrency(Number(value))} contentStyle={chartTooltipStyle} labelStyle={chartTooltipTextStyle} itemStyle={chartTooltipTextStyle} cursor={{ stroke: "var(--primary)", strokeOpacity: 0.3 }} />
+                            <ReferenceLine y={averageNet} stroke="#70a89a" strokeDasharray="5 5" strokeOpacity={0.45} />
+                            <Area type="monotone" dataKey="gross" name="Gross" stroke="#5b8db8" fill="url(#grossSalary)" strokeWidth={2.5} activeDot={{ r: 5, strokeWidth: 0 }} />
+                            <Area type="monotone" dataKey="net" name="Net" stroke="#70a89a" fill="url(#netSalary)" strokeWidth={2.5} activeDot={{ r: 5, strokeWidth: 0 }} />
                         </AreaChart>
                     </ResponsiveContainer>
                     <div className="mt-1 flex items-center justify-end gap-5 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-violet-500" />Gross</span>
-                        <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-emerald-500" />Net</span>
+                        <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-[#5b8db8]" />Gross</span>
+                        <span className="flex items-center gap-2"><span className="h-2 w-2 rounded-full bg-[#70a89a]" />Net</span>
                         <span className="flex items-center gap-2"><span className="h-px w-4 border-t border-dashed border-emerald-500/70" />Net average</span>
                     </div>
                 </>

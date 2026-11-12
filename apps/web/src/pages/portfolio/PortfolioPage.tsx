@@ -1,10 +1,12 @@
-import { useEffect, useState } from "react";
-import { fetchAPI, fetchPrices } from "@/lib/api";
+import { useCallback, useEffect, useState } from "react";
+import { AlertTriangle, CheckCircle2, RefreshCw } from "lucide-react";
+import { fetchAPI } from "@/lib/api";
 import type { PortfolioSummary } from "@/components/portfolio/portfolio.types";
 import { PortfolioSummaryCards, PortfolioSummarySkeleton } from "@/components/portfolio/PortfolioSummaryCards";
 import { ClosedPositionsTable, PortfolioTable } from "@/components/portfolio/PortfolioTable";
 import { TableSkeleton } from "@/components/common/TableSkeleton";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { PortfolioPerformanceChart } from "@/components/reports/PortfolioPerformanceChart";
+import { Button } from "@/components/ui/button";
 import {
     Select,
     SelectContent,
@@ -13,114 +15,120 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 
+function ValuationStatus({ summary }: { summary: PortfolioSummary }) {
+    const { valuation } = summary;
+    const complete = valuation.status === "fresh";
+    const date = valuation.asOf
+        ? new Intl.DateTimeFormat("es-ES", { dateStyle: "medium" }).format(new Date(valuation.asOf))
+        : "sin fecha disponible";
+    const sources = valuation.sources.map((source) => source.toUpperCase()).join(" + ") || "sin fuente";
+    const message = valuation.status === "partial"
+        ? `Valoración incompleta: faltan ${valuation.missingSymbols.join(", ")}.`
+        : valuation.status === "unavailable"
+            ? "No se ha podido obtener ninguna cotización actual."
+            : valuation.status === "stale"
+                ? `Las cotizaciones tienen ${valuation.ageDays} días de antigüedad.`
+                : valuation.status === "delayed"
+                    ? `Las cotizaciones tienen ${valuation.ageDays} días de antigüedad.`
+                    : "Todas las posiciones abiertas tienen cotización.";
+
+    return (
+        <div className={`flex items-start gap-3 border-l-2 px-3 py-2 text-sm ${complete ? "border-emerald-500" : "border-amber-500"}`}>
+            {complete ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" /> : <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />}
+            <div>
+                <p className="font-medium">{message}</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">Datos a {date} / fuentes: {sources}</p>
+            </div>
+        </div>
+    );
+}
+
 export default function PortfolioPage() {
     const [summary, setSummary] = useState<PortfolioSummary | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [method, setMethod] = useState<string>("FIFO");
 
-    const [prices, setPrices] = useState<Record<string, { price: number; currency: string }>>({});
+    const loadSummary = useCallback(async () => {
+        setLoading(true);
+        try {
+            const data = await fetchAPI<PortfolioSummary>(`/portfolio/summary?method=${method}&_t=${Date.now()}`, { cache: "no-store" });
+            setSummary(data);
+            setError(null);
+        } catch (loadError) {
+            console.error(loadError);
+            setError("No se ha podido cargar la cartera.");
+        } finally {
+            setLoading(false);
+        }
+    }, [method]);
+
+    useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch the selected accounting method from the API
+        void loadSummary();
+    }, [loadSummary]);
 
     const openHoldings = summary?.holdings.filter((holding) => holding.remainingShares > 0) ?? [];
     const closedPositions = summary?.holdings.filter((holding) => holding.remainingShares <= 0 && holding.realizedGain !== 0) ?? [];
 
-    useEffect(() => {
-        const fetchSummary = async () => {
-            setLoading(true);
-            try {
-                const data = await fetchAPI<PortfolioSummary>(`/portfolio/summary?method=${method}&_t=${Date.now()}`);
-                setSummary(data);
-
-                // Fetch prices
-                const symbols = data.holdings.map(h => h.symbol);
-                if (symbols.length > 0) {
-                    // Add currency pairs to fetch
-                    const symbolsToFetch = [...symbols, "USDEUR=X"];
-                    try {
-                        const pricesData = await fetchPrices(symbolsToFetch);
-                        setPrices(pricesData);
-                    } catch (e) {
-                        console.error("Failed to fetch prices", e);
-                    }
-                }
-
-                setError(null);
-            } catch (err) {
-                setError("Failed to load portfolio summary");
-                console.error(err);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchSummary();
-    }, [method]);
-
     return (
-        <div className="space-y-6 p-8">
-            <div className="flex items-center justify-between">
-                <h1 className="text-3xl font-bold tracking-tight">Portfolio Overview</h1>
-                <div className="flex gap-4">
-                    <Select value={method} onValueChange={setMethod}>
-                        <SelectTrigger className="w-[180px]">
-                            <SelectValue placeholder="Select method" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="FIFO">FIFO</SelectItem>
-                            <SelectItem value="WeightedAverage">Weighted Average</SelectItem>
-                        </SelectContent>
-                    </Select>
+        <div className="space-y-10 px-4 py-6 md:px-8 md:py-10">
+            <header className="flex flex-col gap-5 border-b border-border pb-7 md:flex-row md:items-end md:justify-between">
+                <div>
+                    <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Patrimonio</p>
+                    <h1 className="mt-2 text-3xl font-semibold tracking-[-0.04em] md:text-4xl">Inversiones</h1>
+                    <p className="mt-2 max-w-xl text-sm text-muted-foreground">Valoración, rentabilidad y posiciones con una única base de cálculo en euros.</p>
                 </div>
-            </div>
+                <div className="flex items-end gap-2">
+                    <label className="grid gap-1 text-xs text-muted-foreground">
+                        Método fiscal
+                        <Select value={method} onValueChange={setMethod}>
+                            <SelectTrigger className="w-[190px] bg-transparent"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="FIFO">FIFO</SelectItem>
+                                <SelectItem value="WeightedAverage">Precio medio ponderado</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </label>
+                    <Button variant="outline" size="icon" onClick={loadSummary} disabled={loading} aria-label="Actualizar valoración">
+                        <RefreshCw className={`h-4 w-4 ${loading ? "animate-spin" : ""}`} />
+                    </Button>
+                </div>
+            </header>
+
+            {error && <div className="border-l-2 border-rose-500 px-4 py-2 text-sm text-rose-600 dark:text-rose-400">{error}</div>}
 
             {loading && !summary ? (
-                <div className="space-y-6">
-                    <PortfolioSummarySkeleton />
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Holdings</CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <TableSkeleton columns={8} rows={5} />
-                        </CardContent>
-                    </Card>
-                </div>
-            ) : error ? (
-                <div className="p-8 text-red-500">{error}</div>
-            ) : (
-                summary && (
-                    <>
-                        <div className="transition-opacity">
-                            <PortfolioSummaryCards summary={summary} prices={prices} />
+                <div className="space-y-10"><PortfolioSummarySkeleton /><TableSkeleton columns={6} rows={5} /></div>
+            ) : summary && (
+                <>
+                    <div className="space-y-4">
+                        <PortfolioSummaryCards summary={summary} />
+                        <ValuationStatus summary={summary} />
+                    </div>
+
+                    <PortfolioPerformanceChart />
+
+                    <section>
+                        <div className="mb-4 flex items-baseline justify-between border-b border-border pb-3">
+                            <h2 className="text-xl font-semibold tracking-tight">Posiciones abiertas</h2>
+                            <span className="text-xs text-muted-foreground">{openHoldings.length} activos</span>
                         </div>
+                        {openHoldings.length > 0
+                            ? <PortfolioTable holdings={openHoldings} valuation={summary.valuation} />
+                            : <p className="py-6 text-sm text-muted-foreground">No hay posiciones abiertas.</p>}
+                    </section>
 
-                        <Card className="transition-opacity">
-                            <CardHeader>
-                                <CardTitle>Open Holdings</CardTitle>
-                            </CardHeader>
-                            <CardContent className="overflow-x-auto">
-                                {openHoldings.length > 0 ? (
-                                    <PortfolioTable holdings={openHoldings} prices={prices} />
-                                ) : (
-                                    <p className="text-sm text-muted-foreground">No open holdings.</p>
-                                )}
-                            </CardContent>
-                        </Card>
-
-                        <Card className="transition-opacity">
-                            <CardHeader>
-                                <CardTitle>Closed Positions</CardTitle>
-                            </CardHeader>
-                            <CardContent className="overflow-x-auto">
-                                {closedPositions.length > 0 ? (
-                                    <ClosedPositionsTable holdings={closedPositions} />
-                                ) : (
-                                    <p className="text-sm text-muted-foreground">No closed positions.</p>
-                                )}
-                            </CardContent>
-                        </Card>
-                    </>
-                )
+                    <section>
+                        <div className="mb-1 flex items-baseline justify-between border-b border-border pb-3">
+                            <h2 className="text-xl font-semibold tracking-tight">Posiciones cerradas</h2>
+                            <span className="text-xs text-muted-foreground">{closedPositions.length} activos</span>
+                        </div>
+                        {closedPositions.length > 0
+                            ? <ClosedPositionsTable holdings={closedPositions} />
+                            : <p className="py-6 text-sm text-muted-foreground">No hay posiciones cerradas.</p>}
+                    </section>
+                </>
             )}
         </div>
     );

@@ -34,6 +34,7 @@ interface SalaryDetailModalProps {
 export default function SalaryDetailModal({ salaryId, onClose }: SalaryDetailModalProps) {
     const [data, setData] = useState<SalaryRecord | null>(null);
     const [pdfUrl, setPdfUrl] = useState<string | null>(null);
+    const [pdfData, setPdfData] = useState<ArrayBuffer | null>(null);
     const [pdfSalaryId, setPdfSalaryId] = useState<string | null>(null);
     const [pdfDocument, setPdfDocument] = useState<PDFDocumentProxy | null>(null);
     const [pdfPageCount, setPdfPageCount] = useState(0);
@@ -44,11 +45,23 @@ export default function SalaryDetailModal({ salaryId, onClose }: SalaryDetailMod
     const canvasRefs = useRef<Record<number, HTMLCanvasElement | null>>({});
 
     useEffect(() => {
+        // A different salary record must never reuse the previous PDF viewer
+        // state while its details are being fetched.
+        setData(null);
+        setIsPdfOpen(false);
+        setPdfError(null);
+        setPdfDocument(null);
+        setPdfPageCount(0);
+        setPdfZoom(1);
+        setPdfSalaryId(null);
+        setPdfData(null);
+        setPdfUrl((previousUrl) => {
+            if (previousUrl) URL.revokeObjectURL(previousUrl);
+            return null;
+        });
+
         if (salaryId) {
             fetchAPI<SalaryRecord>(`/salary/${salaryId}`).then(setData).catch(console.error);
-        } else {
-            // eslint-disable-next-line
-            setData(null);
         }
     }, [salaryId]);
 
@@ -59,10 +72,13 @@ export default function SalaryDetailModal({ salaryId, onClose }: SalaryDetailMod
     }, [pdfUrl]);
 
     useEffect(() => {
-        if (!pdfUrl) return;
+        if (!pdfData) return;
 
         let cancelled = false;
-        const loadingTask = getDocument({ url: pdfUrl });
+        // Load the downloaded bytes directly. Passing the blob URL back to
+        // PDF.js makes it perform a second fetch and can fail for otherwise
+        // valid payslips served with browser-specific blob handling.
+        const loadingTask = getDocument({ data: pdfData });
         loadingTask.onPassword = (_callback: (password: string) => void, _reason: number) => {
             void _callback;
             void _reason;
@@ -89,7 +105,7 @@ export default function SalaryDetailModal({ salaryId, onClose }: SalaryDetailMod
             cancelled = true;
             void loadingTask.destroy();
         };
-    }, [pdfUrl]);
+    }, [pdfData]);
 
     useEffect(() => {
         if (!pdfDocument || !pdfPageCount) return;
@@ -136,6 +152,7 @@ export default function SalaryDetailModal({ salaryId, onClose }: SalaryDetailMod
 
         if (pdfUrl) URL.revokeObjectURL(pdfUrl);
         setPdfUrl(null);
+        setPdfData(null);
         setPdfDocument(null);
         setPdfPageCount(0);
         setPdfZoom(1);
@@ -143,6 +160,7 @@ export default function SalaryDetailModal({ salaryId, onClose }: SalaryDetailMod
         try {
             setIsPdfLoading(true);
             const blob = await fetchBlob(`/salary/${data.id}/file`);
+            setPdfData(await blob.arrayBuffer());
             setPdfUrl(URL.createObjectURL(blob));
             setPdfSalaryId(data.id);
         } catch (error) {
@@ -254,7 +272,16 @@ export default function SalaryDetailModal({ salaryId, onClose }: SalaryDetailMod
                                         <Loader2 className="h-4 w-4 animate-spin" /> Loading document…
                                     </div>
                                 )}
-                                {pdfError && <p className="p-6 text-center text-sm text-destructive">{pdfError}</p>}
+                                {pdfError && pdfUrl ? (
+                                    <div className="flex h-full min-h-[520px] flex-col gap-3">
+                                        <p className="text-center text-sm text-muted-foreground">El visor avanzado no ha podido interpretar este documento. Mostrando el visor nativo.</p>
+                                        <iframe
+                                            title={fixEncoding(data.fileName || "Payslip")}
+                                            src={pdfUrl}
+                                            className="min-h-0 flex-1 rounded border bg-white"
+                                        />
+                                    </div>
+                                ) : pdfError ? <p className="p-6 text-center text-sm text-destructive">{pdfError}</p> : null}
                                 {pdfDocument && !pdfError && (
                                     <div className="flex min-w-full flex-col items-center gap-4">
                                         {Array.from({ length: pdfPageCount }, (_, index) => index + 1).map((pageNumber) => (

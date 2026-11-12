@@ -1,16 +1,20 @@
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
 
 const TOKEN_KEY = 'auth_token';
+let sessionToken: string | null = null;
+// Browser sessions persist only in the server's HttpOnly cookie.
+localStorage.removeItem(TOKEN_KEY);
 
 export function setToken(token: string) {
-    localStorage.setItem(TOKEN_KEY, token);
+    sessionToken = token;
 }
 
 export function getToken(): string | null {
-    return localStorage.getItem(TOKEN_KEY);
+    return sessionToken;
 }
 
 export function removeToken() {
+    sessionToken = null;
     localStorage.removeItem(TOKEN_KEY);
 }
 

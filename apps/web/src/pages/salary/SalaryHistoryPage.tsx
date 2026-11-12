@@ -23,7 +23,7 @@ export default function SalaryHistoryPage() {
     };
 
     return (
-        <div className="container mx-auto max-w-7xl space-y-8 py-8">
+        <div className="space-y-8 p-4 md:p-8">
             <div className="flex items-center gap-4">
                 <Button variant="outline" size="icon" onClick={() => navigate("/salary")} aria-label="Back to salaries"><ArrowLeft className="h-4 w-4" /></Button>
                 <div>

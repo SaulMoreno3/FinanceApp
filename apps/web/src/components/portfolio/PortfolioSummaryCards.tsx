@@ -1,142 +1,80 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { PortfolioSummary } from "@/components/portfolio/portfolio.types";
-import { TrendingUp, Wallet, CircleDollarSign } from "lucide-react";
 
-interface PortfolioSummaryCardsProps {
-    summary: PortfolioSummary;
-    prices: Record<string, { price: number; currency: string }>;
+const euros = new Intl.NumberFormat("es-ES", {
+    style: "currency",
+    currency: "EUR",
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+});
+
+function signedEuros(value: number) {
+    return `${value >= 0 ? "+" : ""}${euros.format(value)}`;
 }
 
-export function PortfolioSummaryCards({ summary, prices }: PortfolioSummaryCardsProps) {
-    const { totalRealizedGain, holdings, conversionComplete } = summary;
-    // Calculate Unrealized metrics
-    const usdEurRate = prices?.["USDEUR=X"]?.price || 0.95;
-    let totalMarketValue = 0;
-    let totalCalculatedCostBasis = 0;
-
-    holdings.forEach((holding) => {
-        if (holding.remainingShares <= 0) return;
-
-        // --- Market Value Calculation ---
-        const quote = prices?.[holding.symbol];
-        let marketValueEUR = 0;
-
-        if (quote) {
-            let priceVal = quote.price;
-
-            // Normalize Quote to EUR
-            if (quote.currency === 'USD') {
-                priceVal = quote.price * usdEurRate;
-            }
-            marketValueEUR = priceVal * holding.remainingShares;
-            totalMarketValue += marketValueEUR;
-        }
-
-        // --- Cost Basis Calculation ---
-        // Calculate cost in EUR
-        const costNative = holding.averageCost * holding.remainingShares;
-        let costEUR = costNative;
-
-        if (holding.currency === 'USD') {
-            costEUR = costNative * usdEurRate;
-        }
-        totalCalculatedCostBasis += costEUR;
-    });
-    const totalUnrealizedGain = totalMarketValue - totalCalculatedCostBasis;
-
+function Metric({ label, value, detail, tone = "neutral" }: {
+    label: string;
+    value: string;
+    detail: string;
+    tone?: "positive" | "negative" | "neutral";
+}) {
+    const toneClass = tone === "positive"
+        ? "text-emerald-600 dark:text-emerald-400"
+        : tone === "negative"
+            ? "text-rose-600 dark:text-rose-400"
+            : "text-foreground";
 
     return (
-        <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">
-                        Total Realized Profit
-                    </CardTitle>
-                    <TrendingUp className={`h-4 w-4 ${(totalRealizedGain ?? 0) >= 0 ? 'text-green-500' : 'text-red-500'}`} />
-                </CardHeader>
-                <CardContent>
-                    <div className={`text-2xl font-bold ${(totalRealizedGain ?? 0) >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                        {conversionComplete && totalRealizedGain !== null
-                            ? `${totalRealizedGain >= 0 ? '+' : ''}€${totalRealizedGain.toFixed(2)}`
-                            : 'Unavailable'}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                        {conversionComplete ? 'Lifetime realized gains' : 'Missing historical exchange rates'}
-                    </p>
-                </CardContent>
-            </Card>
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">
-                        Invested Capital
-                    </CardTitle>
-                    <Wallet className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold">
-                        €{totalCalculatedCostBasis.toFixed(2)}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                        Current active investment
-                    </p>
-                </CardContent>
-            </Card>
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">
-                        Total Market Value
-                    </CardTitle>
-                    <CircleDollarSign className="h-4 w-4 text-muted-foreground" />
-                </CardHeader>
-                <CardContent>
-                    <div className="text-2xl font-bold">
-                        €{totalMarketValue.toFixed(2)}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                        Current value of active positions
-                    </p>
-                </CardContent>
-            </Card>
-            <Card>
-                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">
-                        Unrealized Profit
-                    </CardTitle>
-                    <TrendingUp className={`h-4 w-4 ${totalUnrealizedGain >= 0 ? 'text-green-500' : 'text-red-500'}`} />
-                </CardHeader>
-                <CardContent>
-                    <div className={`text-2xl font-bold ${totalUnrealizedGain >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                        {totalUnrealizedGain >= 0 ? '+' : ''}€{totalUnrealizedGain.toFixed(2)}
-                        <span className="text-sm ml-2 font-normal opacity-80">
-                            {totalCalculatedCostBasis > 0
-                                ? `(${totalUnrealizedGain >= 0 ? '+' : ''}${((totalUnrealizedGain / totalCalculatedCostBasis) * 100).toFixed(2)}%)`
-                                : ''}
-                        </span>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                        Total Market Value: €{totalMarketValue.toFixed(2)}
-                    </p>
-                </CardContent>
-            </Card>
+        <div className="min-w-0 border-t border-border py-4 md:border-l md:border-t-0 md:px-6 md:first:border-l-0 md:first:pl-0">
+            <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
+            <p className={`mt-2 truncate text-2xl font-semibold tracking-[-0.03em] tabular-nums ${toneClass}`}>{value}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
         </div>
+    );
+}
+
+export function PortfolioSummaryCards({ summary }: { summary: PortfolioSummary }) {
+    const valuation = summary.valuation;
+    const realized = summary.totalRealizedGain;
+    const unrealized = valuation.totalUnrealizedGain;
+
+    return (
+        <section aria-label="Resumen de la cartera" className="grid border-b border-t border-border md:grid-cols-4">
+            <Metric
+                label="Valor actual"
+                value={valuation.totalMarketValue === null ? "Incompleto" : euros.format(valuation.totalMarketValue)}
+                detail={valuation.totalMarketValue === null ? "Faltan cotizaciones" : `${Object.keys(valuation.positions).length} posiciones valoradas`}
+            />
+            <Metric
+                label="Capital invertido"
+                value={valuation.totalCostBasis === null ? "Incompleto" : euros.format(valuation.totalCostBasis)}
+                detail="Coste vivo convertido a EUR"
+            />
+            <Metric
+                label="Resultado no realizado"
+                value={unrealized === null ? "Incompleto" : signedEuros(unrealized)}
+                detail={valuation.totalUnrealizedGainPercent === null ? "Sin base comparable" : `${valuation.totalUnrealizedGainPercent >= 0 ? "+" : ""}${valuation.totalUnrealizedGainPercent.toFixed(2)} % sobre coste`}
+                tone={unrealized === null ? "neutral" : unrealized >= 0 ? "positive" : "negative"}
+            />
+            <Metric
+                label="Resultado realizado"
+                value={realized === null ? "Incompleto" : signedEuros(realized)}
+                detail="Beneficio histórico de ventas"
+                tone={realized === null ? "neutral" : realized >= 0 ? "positive" : "negative"}
+            />
+        </section>
     );
 }
 
 export function PortfolioSummarySkeleton() {
     return (
-        <div className="grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-4">
-            {Array.from({ length: 4 }).map((_, i) => (
-                <Card key={i}>
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <Skeleton className="h-4 w-[100px]" />
-                        <Skeleton className="h-4 w-4 rounded-full" />
-                    </CardHeader>
-                    <CardContent>
-                        <Skeleton className="h-8 w-[120px] mb-1" />
-                        <Skeleton className="h-3 w-[140px]" />
-                    </CardContent>
-                </Card>
+        <div className="grid border-b border-t border-border py-4 md:grid-cols-4 md:py-0">
+            {Array.from({ length: 4 }).map((_, index) => (
+                <div key={index} className="space-y-3 py-4 md:border-l md:px-6 md:first:border-l-0 md:first:pl-0">
+                    <Skeleton className="h-3 w-28" />
+                    <Skeleton className="h-8 w-36" />
+                    <Skeleton className="h-3 w-32" />
+                </div>
             ))}
         </div>
     );

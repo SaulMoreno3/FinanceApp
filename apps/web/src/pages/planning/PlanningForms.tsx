@@ -1,0 +1,26 @@
+import { useState, type FormEvent } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { cadences, type Recurring, type Movement, type Plan } from './planning.types';
+export const selectClass='h-10 w-full rounded-md border border-input bg-background px-3 text-sm text-foreground';
+export function RecurringForm({initial,onSave,busy}:{initial:Recurring;onSave:(r:Recurring)=>void;busy:boolean}) {
+ const [form,setForm]=useState(initial);
+ const update=<K extends keyof Recurring>(key:K,value:Recurring[K])=>setForm(v=>({...v,[key]:value,...(['nextDate','kind','cadence'].includes(key)?{salarySchedule:null}:{})}));
+ const submit=(e:FormEvent)=>{e.preventDefault();onSave(form);};
+ return <form className="space-y-4" onSubmit={submit}>
+  <div className="space-y-2"><Label htmlFor="rec-name">Nombre</Label><Input id="rec-name" required maxLength={120} value={form.name} onChange={e=>update('name',e.target.value)}/></div>
+  <div className="grid grid-cols-2 gap-3"><div className="space-y-2"><Label htmlFor="rec-amount">Importe por cobro</Label><Input id="rec-amount" type="number" required min="0.01" step="0.01" max="100000000" value={form.amount||''} onChange={e=>update('amount',Number(e.target.value))}/></div><div className="space-y-2"><Label htmlFor="rec-currency">Moneda</Label><Input id="rec-currency" required pattern="[A-Z]{3}" maxLength={3} value={form.currency} onChange={e=>update('currency',e.target.value.toUpperCase())}/></div></div>
+  <div className="grid grid-cols-2 gap-3"><div className="space-y-2"><Label htmlFor="rec-kind">Tipo</Label><select id="rec-kind" className={selectClass} value={form.kind} onChange={e=>update('kind',e.target.value as Recurring['kind'])}><option value="SUBSCRIPTION">Suscripción</option><option value="EXPENSE">Gasto recurrente</option><option value="INCOME">Ingreso recurrente</option></select></div><div className="space-y-2"><Label htmlFor="rec-cadence">Frecuencia</Label><select id="rec-cadence" className={selectClass} value={form.cadence} onChange={e=>update('cadence',e.target.value as Recurring['cadence'])}>{Object.entries(cadences).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></div></div>
+  <div className="grid grid-cols-2 gap-3"><div className="space-y-2"><Label htmlFor="rec-date">Próxima fecha prevista</Label><Input id="rec-date" required type="date" min="2000-01-01" max="2099-12-31" value={form.nextDate} onChange={e=>update('nextDate',e.target.value)}/></div><div className="space-y-2"><Label htmlFor="rec-end">Hasta (opcional)</Label><Input id="rec-end" type="date" min={form.nextDate} max="2099-12-31" value={form.endDate??''} onChange={e=>update('endDate',e.target.value||null)}/></div></div>
+  {form.salarySchedule&&<p className="text-xs text-muted-foreground">Pauta detectada: {form.salarySchedule.day===31?'último día del mes':`día ${form.salarySchedule.day}`} {form.salarySchedule.weekendAdjustment==='PREVIOUS'?'(adelanto al viernes si cae en fin de semana)':form.salarySchedule.weekendAdjustment==='NEXT'?'(paso al lunes si cae en fin de semana)':''}. Si cambias la fecha o la frecuencia, se usará tu calendario manual.</p>}
+  <div className="space-y-2"><Label htmlFor="rec-notes">Notas</Label><Input id="rec-notes" maxLength={500} value={form.notes} onChange={e=>update('notes',e.target.value)}/></div>
+  <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={form.active} onChange={e=>update('active',e.target.checked)}/>Incluir en la previsión</label>
+  <p className="text-xs text-muted-foreground">Esto organiza tus previsiones. No contrata, cancela ni modifica cobros en el proveedor.</p>
+  <Button type="submit" disabled={busy}>{busy?'Guardando…':'Guardar recurrencia'}</Button>
+ </form>;
+}
+export function TransactionForm({row,override,onSave,busy}:{row:Movement;override?:Plan['transactionOverrides'][string];onSave:(value:Plan['transactionOverrides'][string])=>void;busy:boolean}){
+ const [kind,setKind]=useState<Plan['transactionOverrides'][string]['kind']>(override?.kind??'AUTO'),[category,setCategory]=useState(override?.category??'');
+ return <form className="space-y-4" onSubmit={e=>{e.preventDefault();onSave({kind,category});}}><p className="text-sm">{row.merchantName||row.description}</p><div className="space-y-2"><Label htmlFor="movement-kind">Clasificación</Label><select id="movement-kind" className={selectClass} value={kind} onChange={e=>setKind(e.target.value as typeof kind)}><option value="AUTO">Automática</option><option value="TRANSFER">Traspaso / inversión / efectivo</option><option value="EXPENSE" disabled={row.amount>=0}>Gasto</option><option value="INCOME" disabled={row.amount<0}>Ingreso / devolución</option></select></div><div className="space-y-2"><Label htmlFor="movement-category">Categoría personalizada</Label><Input id="movement-category" maxLength={80} value={category} placeholder={row.displayCategory} onChange={e=>setCategory(e.target.value)}/></div><p className="text-xs text-muted-foreground">Se aplica al análisis. Se conserva el movimiento original del banco.</p><Button disabled={busy} type="submit">Guardar clasificación</Button></form>;
+}

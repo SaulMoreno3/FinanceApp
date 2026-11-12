@@ -1,3 +1,4 @@
+import { NetWorthSources } from "@/components/net-worth/NetWorthSources";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
     Activity,
@@ -5,7 +6,6 @@ import {
     ArrowUpRight,
     Banknote,
     BriefcaseBusiness,
-    CircleDollarSign,
     TrendingUp,
     Wallet,
 } from "lucide-react";
@@ -30,7 +30,8 @@ import {
     PortfolioExposureChart,
     SalaryTrendChart,
 } from "@/components/reports/ReportCharts";
-import { PortfolioPerformanceChart } from "@/components/reports/PortfolioPerformanceChart";
+import { holdingCostEur } from "@/components/reports/report-data";
+import { BankBalanceHistory } from "@/components/reports/BankBalanceHistory";
 
 interface Transaction {
     id: string;
@@ -56,7 +57,6 @@ interface ReportData {
 }
 
 type ReportSection = keyof ReportData;
-type MetricTone = "violet" | "blue" | "emerald" | "amber";
 
 const emptyNetWorth: NetWorthSummary = {
     totalCurrentNetWorth: 0,
@@ -72,6 +72,19 @@ const emptyPortfolio: PortfolioSummary = {
     totalRealizedGain: null,
     totalCostBasis: null,
     conversionComplete: true,
+    valuation: {
+        currency: "EUR",
+        status: "unavailable",
+        asOf: null,
+        ageDays: null,
+        totalMarketValue: null,
+        totalCostBasis: null,
+        totalUnrealizedGain: null,
+        totalUnrealizedGainPercent: null,
+        missingSymbols: [],
+        sources: [],
+        positions: {},
+    },
     holdings: [],
 };
 
@@ -111,63 +124,34 @@ function transactionIsPositive(transaction: Transaction) {
     return transaction.side === "Sell" || transaction.type === "Dividend" || transaction.type === "Income";
 }
 
-const metricStyles: Record<MetricTone, { glow: string; icon: string; accent: string }> = {
-    violet: {
-        glow: "from-violet-500/20 via-violet-500/[0.04] to-transparent",
-        icon: "border-violet-500/20 bg-violet-500/10 text-violet-400",
-        accent: "bg-violet-500",
-    },
-    blue: {
-        glow: "from-blue-500/20 via-blue-500/[0.04] to-transparent",
-        icon: "border-blue-500/20 bg-blue-500/10 text-blue-400",
-        accent: "bg-blue-500",
-    },
-    emerald: {
-        glow: "from-emerald-500/20 via-emerald-500/[0.04] to-transparent",
-        icon: "border-emerald-500/20 bg-emerald-500/10 text-emerald-400",
-        accent: "bg-emerald-500",
-    },
-    amber: {
-        glow: "from-amber-500/20 via-amber-500/[0.04] to-transparent",
-        icon: "border-amber-500/20 bg-amber-500/10 text-amber-400",
-        accent: "bg-amber-500",
-    },
-};
-
-function MetricCard({
-    title,
-    value,
-    description,
-    icon: Icon,
-    tone,
-    valueClassName = "",
-}: {
-    title: string;
-    value: string;
-    description: string;
-    icon: typeof Wallet;
-    tone: MetricTone;
-    valueClassName?: string;
+function MetricCard({ title, value, description, icon: Icon, valueClassName = "" }: {
+    title: string; value: string; description: string; icon: typeof Wallet; valueClassName?: string;
 }) {
-    const styles = metricStyles[tone];
-    return (
-        <Card className="group relative overflow-hidden border-border/70 bg-card/80 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-border hover:shadow-xl hover:shadow-black/10">
-            <div className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${styles.glow} opacity-70 transition-opacity group-hover:opacity-100`} />
-            <div className={`absolute inset-x-0 top-0 h-0.5 ${styles.accent}`} />
-            <CardContent className="relative p-5">
-                <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{title}</p>
-                        <p className={`mt-3 truncate text-2xl font-bold tracking-tight xl:text-[1.7rem] ${valueClassName}`}>{value}</p>
-                        <p className="mt-2 text-xs text-muted-foreground">{description}</p>
-                    </div>
-                    <div className={`shrink-0 rounded-xl border p-2.5 ${styles.icon}`}>
-                        <Icon className="h-4 w-4" />
-                    </div>
-                </div>
-            </CardContent>
-        </Card>
-    );
+    return <Card className="shadow-none">
+        <CardContent className="p-5">
+            <div className="flex items-center justify-between gap-3 text-muted-foreground">
+                <p className="text-sm">{title}</p><Icon className="h-4 w-4" aria-hidden="true" />
+            </div>
+            <p className={`mt-3 break-words text-2xl font-semibold tracking-tight tabular-nums ${valueClassName}`}>{value}</p>
+            <p className="mt-2 text-xs text-muted-foreground">{description}</p>
+        </CardContent>
+    </Card>;
+}
+
+async function loadReportSalaries(): Promise<SalaryListResponse> {
+    const year = new Date().getFullYear();
+    const query = `limit=100&from=${year}-01-01&to=${year}-12-31`;
+    const first = await fetchAPI<SalaryListResponse>(`/salary?page=1&${query}`);
+    const data = [...first.data];
+    for (let page = 2; page <= first.meta.totalPages; page++) {
+        const next = await fetchAPI<SalaryListResponse>(`/salary?page=${page}&${query}`);
+        data.push(...next.data);
+    }
+    return { ...first, data: data.filter((salary) => !/employment contribution report/i.test(salary.notes ?? "")) };
+}
+
+function SectionUnavailable({ label }: { label: string }) {
+    return <p role="status" className="rounded-lg border border-border p-6 text-sm text-muted-foreground">{label} is unavailable. Use Refresh to try again.</p>;
 }
 
 function LoadingState() {
@@ -195,7 +179,7 @@ export default function ReportsPage() {
         const requests = {
             netWorth: fetchAPI<NetWorthSummary>("/networth/summary"),
             portfolio: fetchAPI<PortfolioSummary>("/portfolio/summary?method=FIFO"),
-            salaries: fetchAPI<SalaryListResponse>("/salary?page=1&limit=100"),
+            salaries: loadReportSalaries(),
             transactions: fetchAPI<TransactionsResponse>("/transactions?page=1&limit=8"),
         } satisfies Record<ReportSection, Promise<unknown>>;
 
@@ -242,7 +226,7 @@ export default function ReportsPage() {
     const salaryMetrics = useMemo(() => {
         const currentYear = new Date().getFullYear();
         const currentYearSalaries = data?.salaries.data.filter((salary) => {
-            return salary.date && new Date(salary.date).getFullYear() === currentYear;
+            return salary.date && new Date(salary.date).getUTCFullYear() === currentYear;
         }) ?? [];
         const gross = currentYearSalaries.reduce((total, salary) => total + Number(salary.grossSalary ?? 0), 0);
         const net = currentYearSalaries.reduce((total, salary) => total + Number(salary.netSalary ?? 0), 0);
@@ -259,7 +243,7 @@ export default function ReportsPage() {
     const holdings = useMemo(() => {
         return [...(data?.portfolio.holdings ?? [])]
             .filter((holding) => holding.remainingShares > 0)
-            .sort((left, right) => right.totalCostBasis - left.totalCostBasis);
+            .sort((left, right) => (holdingCostEur(right) ?? 0) - (holdingCostEur(left) ?? 0));
     }, [data]);
 
     if (isLoading && !data) {
@@ -280,11 +264,12 @@ export default function ReportsPage() {
     }
 
     return (
-        <div className="relative min-h-full overflow-hidden">
-            <div className="pointer-events-none absolute -right-40 -top-36 h-96 w-96 rounded-full bg-violet-500/[0.07] blur-3xl" />
-            <div className="pointer-events-none absolute -left-32 top-[36rem] h-80 w-80 rounded-full bg-blue-500/[0.05] blur-3xl" />
-
-            <div className="relative space-y-6 p-5 md:p-8">
+        <div className="min-h-full text-foreground">
+            <div className="space-y-6 p-4 md:p-8">
+                <div className="flex items-center justify-between gap-4">
+                    <div><h2 className="text-xl font-semibold">Reports</h2><p className="mt-1 text-sm text-muted-foreground">Your finances at a glance · {new Date().getFullYear()}</p></div>
+                    <Button variant="outline" size="sm" disabled={isLoading} onClick={loadReports}>{isLoading ? "Refreshing…" : "Refresh"}</Button>
+                </div>
                 {Object.keys(sectionErrors).length > 0 && (
                     <div className="flex items-center gap-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-300">
                         <Activity className="h-4 w-4 shrink-0" />
@@ -295,50 +280,46 @@ export default function ReportsPage() {
                 <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                     <MetricCard
                         title="Net worth"
-                        value={formatCurrency(data.netWorth.totalCurrentNetWorth)}
-                        description={`${data.netWorth.countActive} active assets`}
+                        value={sectionErrors.netWorth ? "Unavailable" : formatCurrency(data.netWorth.totalCurrentNetWorth)}
+                        description={sectionErrors.netWorth ? "Could not load assets" : `${data.netWorth.countActive} manual assets · banks + portfolio − debts`}
                         icon={Wallet}
-                        tone="violet"
                     />
                     <MetricCard
                         title="Invested capital"
-                        value={data.portfolio.totalCostBasis === null ? "Not available" : formatCurrency(data.portfolio.totalCostBasis)}
-                        description={`${holdings.length} open positions`}
+                        value={sectionErrors.portfolio || data.portfolio.totalCostBasis === null ? "Not available" : formatCurrency(data.portfolio.totalCostBasis)}
+                        description={sectionErrors.portfolio ? "Could not load portfolio" : `${holdings.length} open positions`}
                         icon={BriefcaseBusiness}
-                        tone="blue"
                     />
                     <MetricCard
                         title="Realized profit"
-                        value={data.portfolio.totalRealizedGain === null ? "Not available" : formatCurrency(data.portfolio.totalRealizedGain)}
+                        value={sectionErrors.portfolio || data.portfolio.totalRealizedGain === null ? "Not available" : formatCurrency(data.portfolio.totalRealizedGain)}
                         description="Accumulated from closed trades"
                         icon={TrendingUp}
-                        tone="emerald"
-                        valueClassName={(data.portfolio.totalRealizedGain ?? 0) >= 0 ? "text-emerald-500" : "text-rose-500"}
+                        valueClassName={(data.portfolio.totalRealizedGain ?? 0) >= 0 ? "text-emerald-700 dark:text-emerald-400" : "text-rose-700 dark:text-rose-400"}
                     />
                     <MetricCard
                         title="Gross income YTD"
-                        value={formatCurrency(salaryMetrics.gross)}
-                        description={`${salaryMetrics.count} income records in ${new Date().getFullYear()}`}
+                        value={sectionErrors.salaries ? "Unavailable" : formatCurrency(salaryMetrics.gross)}
+                        description={sectionErrors.salaries ? "Could not load income" : `${salaryMetrics.count} income records in ${new Date().getFullYear()}`}
                         icon={Banknote}
-                        tone="amber"
                     />
                 </section>
 
-                <section>
-                    <PortfolioPerformanceChart />
-                </section>
-
+                {!sectionErrors.netWorth && <NetWorthSources summary={data.netWorth} />}
                 <section className="grid gap-6 xl:grid-cols-2">
-                    <AssetAllocationChart categories={data.netWorth.breakdownByCategory} />
-                    <PortfolioExposureChart holdings={data.portfolio.holdings} />
+                    {sectionErrors.netWorth ? <SectionUnavailable label="Asset allocation" /> : <AssetAllocationChart categories={data.netWorth.breakdownByCategory} />}
+                    {sectionErrors.portfolio ? <SectionUnavailable label="Portfolio exposure" /> : <PortfolioExposureChart holdings={data.portfolio.holdings} />}
                 </section>
+
+                <section><BankBalanceHistory /></section>
 
                 <section>
-                    <SalaryTrendChart salaries={data.salaries.data} />
+                    {sectionErrors.salaries ? <SectionUnavailable label="Income" /> : <SalaryTrendChart salaries={data.salaries.data} />}
                 </section>
 
-                <section className="grid gap-6 xl:grid-cols-[1.55fr_0.75fr]">
-                    <Card className="overflow-hidden border-border/70 bg-card/80 shadow-sm">
+                <details className="space-y-4">
+                    <summary className="cursor-pointer text-sm font-medium">Open positions · view details</summary>
+                    <Card className="overflow-hidden border-border bg-card shadow-none">
                         <CardHeader className="border-b border-border/60 bg-muted/[0.12]">
                             <div className="flex items-start justify-between gap-4">
                                 <div>
@@ -349,7 +330,7 @@ export default function ReportsPage() {
                             </div>
                         </CardHeader>
                         <CardContent className="overflow-x-auto p-0">
-                            {holdings.length === 0 ? (
+                            {sectionErrors.portfolio ? <SectionUnavailable label="Open positions" /> : holdings.length === 0 ? (
                                 <p className="py-14 text-center text-sm text-muted-foreground">There are no open positions yet.</p>
                             ) : (
                                 <Table>
@@ -362,16 +343,17 @@ export default function ReportsPage() {
                                         </TableRow>
                                     </TableHeader>
                                     <TableBody>
-                                        {holdings.slice(0, 10).map((holding, index) => {
+                                        {holdings.map((holding) => {
                                             const portfolioCostBasis = data.portfolio.totalCostBasis;
-                                            const weight = portfolioCostBasis !== null && portfolioCostBasis > 0
-                                                ? (holding.totalCostBasis / portfolioCostBasis) * 100
-                                                : 0;
+                                            const costEur = holdingCostEur(holding);
+                                            const weight = costEur !== null && portfolioCostBasis !== null && portfolioCostBasis > 0
+                                                ? (costEur / portfolioCostBasis) * 100
+                                                : null;
                                             return (
                                                 <TableRow key={`${holding.symbol}-${holding.currency}`} className="border-border/50 transition-colors hover:bg-muted/25">
                                                     <TableCell className="pl-6">
                                                         <div className="flex items-center gap-3">
-                                                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border/70 bg-gradient-to-br from-primary/15 to-primary/[0.03] text-xs font-bold text-primary">
+                                                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-border/70 bg-muted text-xs font-bold text-primary">
                                                                 {(holding.symbol || holding.name || "?").slice(0, 2).toUpperCase()}
                                                             </div>
                                                             <div className="min-w-0">
@@ -383,16 +365,16 @@ export default function ReportsPage() {
                                                         </div>
                                                     </TableCell>
                                                     <TableCell className="text-right tabular-nums">{numberFormatter.format(holding.remainingShares)}</TableCell>
-                                                    <TableCell className="text-right font-medium tabular-nums">{formatCurrency(holding.totalCostBasis)}</TableCell>
+                                                    <TableCell className="text-right font-medium tabular-nums">{costEur === null ? "Unavailable" : formatCurrency(costEur)}</TableCell>
                                                     <TableCell className="pr-6">
                                                         <div className="flex items-center gap-3">
                                                             <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
                                                                 <div
-                                                                    className="h-full rounded-full bg-gradient-to-r from-violet-500 to-blue-500"
-                                                                    style={{ width: `${Math.min(weight, 100)}%`, opacity: Math.max(0.45, 1 - index * 0.06) }}
+                                                                    className="h-full rounded-full bg-primary/70"
+                                                                    style={{ width: `${Math.min(weight ?? 0, 100)}%` }}
                                                                 />
                                                             </div>
-                                                            <span className="w-11 text-right text-xs font-semibold tabular-nums">{weight.toFixed(1)}%</span>
+                                                            <span className="w-11 text-right text-xs font-semibold tabular-nums">{weight === null ? "—" : `${weight.toFixed(1)}%`}</span>
                                                         </div>
                                                     </TableCell>
                                                 </TableRow>
@@ -404,62 +386,11 @@ export default function ReportsPage() {
                         </CardContent>
                     </Card>
 
-                    <Card className="relative overflow-hidden border-border/70 bg-card/80 shadow-sm">
-                        <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-emerald-500/[0.08] to-transparent" />
-                        <CardHeader className="relative">
-                            <div className="flex items-center justify-between">
-                                <div>
-                                    <CardTitle className="text-base">Income snapshot</CardTitle>
-                                    <CardDescription className="mt-1.5">Current year take-home view</CardDescription>
-                                </div>
-                                <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-2.5 text-emerald-400">
-                                    <CircleDollarSign className="h-4 w-4" />
-                                </div>
-                            </div>
-                        </CardHeader>
-                        <CardContent className="relative space-y-6">
-                            <div>
-                                <div className="flex items-end justify-between gap-4">
-                                    <div>
-                                        <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Take-home rate</p>
-                                        <p className="mt-2 text-4xl font-bold tracking-tight text-emerald-500">{salaryMetrics.takeHomeRate.toFixed(1)}%</p>
-                                    </div>
-                                    <p className="pb-1 text-xs text-muted-foreground">Net / gross</p>
-                                </div>
-                                <div className="mt-4 h-2 overflow-hidden rounded-full bg-muted">
-                                    <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-cyan-400" style={{ width: `${Math.min(salaryMetrics.takeHomeRate, 100)}%` }} />
-                                </div>
-                            </div>
 
-                            <div className="grid grid-cols-2 gap-3">
-                                <div className="rounded-xl border border-border/70 bg-muted/20 p-3.5">
-                                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">Gross</p>
-                                    <p className="mt-1.5 font-bold tabular-nums">{formatCurrency(salaryMetrics.gross)}</p>
-                                </div>
-                                <div className="rounded-xl border border-emerald-500/15 bg-emerald-500/[0.07] p-3.5">
-                                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-500">Net</p>
-                                    <p className="mt-1.5 font-bold tabular-nums">{formatCurrency(salaryMetrics.net)}</p>
-                                </div>
-                            </div>
-
-                            <div className="border-t border-border/60 pt-5">
-                                <p className="text-xs text-muted-foreground">Latest income</p>
-                                <div className="mt-2 flex items-center justify-between gap-3">
-                                    <div className="min-w-0">
-                                        <p className="truncate text-sm font-medium">{salaryMetrics.latest?.company || "No income recorded"}</p>
-                                        <p className="mt-0.5 text-xs text-muted-foreground">{salaryMetrics.latest ? formatDate(salaryMetrics.latest.date) : "—"}</p>
-                                    </div>
-                                    <p className="shrink-0 font-bold tabular-nums">
-                                        {salaryMetrics.latest ? formatCurrency(Number(salaryMetrics.latest.netSalary ?? 0)) : "—"}
-                                    </p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </section>
+                </details>
 
                 <section>
-                    <Card className="overflow-hidden border-border/70 bg-card/80 shadow-sm">
+                    <Card className="overflow-hidden border-border bg-card shadow-none">
                         <CardHeader className="border-b border-border/60 bg-muted/[0.12]">
                             <div className="flex items-start justify-between gap-4">
                                 <div>
@@ -470,7 +401,7 @@ export default function ReportsPage() {
                             </div>
                         </CardHeader>
                         <CardContent className="p-0">
-                            {data.transactions.data.length === 0 ? (
+                            {sectionErrors.transactions ? <SectionUnavailable label="Recent activity" /> : data.transactions.data.length === 0 ? (
                                 <p className="py-14 text-center text-sm text-muted-foreground">No recent transactions.</p>
                             ) : (
                                 <div className="divide-y divide-border/50">
@@ -478,7 +409,7 @@ export default function ReportsPage() {
                                         const isPositive = transactionIsPositive(transaction);
                                         return (
                                             <div key={transaction.id} className="grid gap-3 px-5 py-4 transition-colors hover:bg-muted/20 sm:grid-cols-[auto_1fr_auto_auto] sm:items-center md:px-6">
-                                                <div className={`flex h-9 w-9 items-center justify-center rounded-xl border ${isPositive ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-500" : "border-rose-500/20 bg-rose-500/10 text-rose-500"}`}>
+                                                <div className={`flex h-9 w-9 items-center justify-center rounded-xl border ${isPositive ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" : "border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-400"}`}>
                                                     {isPositive ? <ArrowUpRight className="h-4 w-4" /> : <ArrowDownRight className="h-4 w-4" />}
                                                 </div>
                                                 <div className="min-w-0">
@@ -490,7 +421,7 @@ export default function ReportsPage() {
                                                     </p>
                                                 </div>
                                                 <Badge variant="secondary" className="w-fit font-normal">{displayTransactionType(transaction.type, transaction.side)}</Badge>
-                                                <p className={`text-right text-sm font-semibold tabular-nums ${isPositive ? "text-emerald-500" : "text-foreground"}`}>
+                                                <p className={`text-right text-sm font-semibold tabular-nums ${isPositive ? "text-emerald-700 dark:text-emerald-400" : "text-foreground"}`}>
                                                     {isPositive ? "+" : ""}{formatCurrency(transaction.value, transaction.currency)}
                                                 </p>
                                             </div>

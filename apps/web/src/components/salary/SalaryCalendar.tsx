@@ -63,7 +63,7 @@ export default function SalaryCalendar({ refreshTrigger }: SalaryCalendarProps) 
     return (
         <Card>
             <CardHeader>
-                <CardTitle>Monthly net income</CardTitle>
+                <CardTitle>Monthly net payroll</CardTitle>
             </CardHeader>
             <CardContent className="overflow-x-auto px-3 sm:px-4">
                 <Table className="w-full min-w-[980px] table-fixed text-xs md:min-w-0">

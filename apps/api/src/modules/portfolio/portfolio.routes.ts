@@ -5,6 +5,7 @@ import { authenticateToken } from '../auth/auth.middleware';
 const router = Router();
 
 router.use(authenticateToken);
+router.post('/trade',portfolioController.createTrade.bind(portfolioController));
 
 router.get('/summary', portfolioController.getPortfolioSummary.bind(portfolioController));
 router.get('/history', portfolioController.getPortfolioHistory.bind(portfolioController));

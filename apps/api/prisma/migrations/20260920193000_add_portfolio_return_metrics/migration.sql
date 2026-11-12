@@ -1,0 +1,4 @@
+ALTER TABLE "portfolio_daily_snapshots"
+ADD COLUMN "cashInflows" DECIMAL(20, 8) NOT NULL DEFAULT 0,
+ADD COLUMN "cashOutflows" DECIMAL(20, 8) NOT NULL DEFAULT 0,
+ADD COLUMN "dailyReturn" DECIMAL(20, 12) NOT NULL DEFAULT 0;

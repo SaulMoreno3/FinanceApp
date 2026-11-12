@@ -39,6 +39,7 @@ export interface CategoryBreakdown {
 
 // Updated to match backend response
 export interface NetWorthSummary {
+    sources?: { manualAssets: number; bankAccounts: number; flexibleFunds: number; portfolio: number; bankUpdatedAt: string | null; portfolioDate: string | null; portfolioEstimated: boolean; missingBankBalances: number };
     totalCurrentNetWorth: number;
     countActive: number;
     countSold: number;

@@ -6,6 +6,7 @@ export const taxReturnSchema = z.object({
     status: z.enum(['Draft', 'Filed', 'Amended']).default('Draft'),
     totalIncome: z.coerce.number().min(0).max(999999999).default(0),
     taxPaid: z.coerce.number().min(0).max(999999999).default(0),
+    finalTaxResult: z.preprocess(value => value === "" || value === undefined ? null : value, z.coerce.number().min(-999999999).max(999999999).nullable()),
     filingDate: z.string().date().optional(),
     notes: z.string().trim().max(5000).optional(),
 });

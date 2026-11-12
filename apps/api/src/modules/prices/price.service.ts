@@ -7,9 +7,18 @@ interface PriceCache {
     [symbol: string]: {
         price: number;
         currency: string;
+        asOf: string | null;
+        source: 'yahoo' | 'eodhd';
         timestamp: number;
     }
 }
+
+export type PriceQuote = {
+    price: number;
+    currency: string;
+    asOf: string | null;
+    source: 'yahoo' | 'eodhd';
+};
 
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes cache
 const EODHD_BASE_URL = 'https://eodhd.com/api/eod';
@@ -33,10 +42,9 @@ export class PriceService {
         'MSCI WORLD INDEX P ACC EUR': 'IE00BYX5NX33.SG',  // Fidelity MSCI World Index Fund P-Acc-EUR (IE00BYX5NX33)
     };
 
-    async getPrices(symbols: string[]): Promise<Record<string, { price: number, currency: string }>> {
-        const results: Record<string, { price: number, currency: string }> = {};
+    async getPrices(symbols: string[]): Promise<Record<string, PriceQuote>> {
+        const results: Record<string, PriceQuote> = {};
         const symbolsToFetch: string[] = [];
-        const requestMap: Record<string, string> = {}; // Mapped Ticker -> Original Symbol
         const now = Date.now();
 
         // Check cache & Prepare fetch list
@@ -45,20 +53,21 @@ export class PriceService {
 
             const cached = this.cache[ticker]; // Cache by Ticker to avoid dupe fetching
             if (cached && (now - cached.timestamp < CACHE_TTL_MS)) {
-                results[symbol] = { price: cached.price, currency: cached.currency };
+                results[symbol] = {
+                    price: cached.price,
+                    currency: cached.currency,
+                    asOf: cached.asOf,
+                    source: cached.source,
+                };
             } else {
+                // European mutual funds are resolved by ISIN through EODHD.
+                // Sending them in the Yahoo batch can make an otherwise valid
+                // stock batch fail as a whole.
+                if (FUND_ISINS.has(symbol)) continue;
                 // If not in cache, add to fetch list
                 if (!symbolsToFetch.includes(ticker)) {
                     symbolsToFetch.push(ticker);
                 }
-                // Track who requested this ticker (so we can map back to 'symbol')
-                // Note: Multiple symbols might map to same ticker.
-                // We need a reverse lookup.
-                requestMap[ticker] = symbol; // Simple 1:1 assumption for now, or last wins. 
-                // Better: iterate symbolsToFetch later? 
-                // Actually, logic below iterates `quotes`. We need to know which Original Symbol implies this Quote.
-                // If we have 'Fund A' -> 'IWDA.AS' and 'Fund B' -> 'IWDA.AS'.
-                // Quote comes for 'IWDA.AS'. We need to populate results['Fund A'] AND results['Fund B'].
             }
         }
 
@@ -66,16 +75,14 @@ export class PriceService {
         // Above loop handles cache hits.
         // `symbolsToFetch` now has Tickers (e.g. 'IWDA.AS').
 
-        if (symbolsToFetch.length === 0) {
-            return results;
-        }
-
         // Fetch from Yahoo
-        try {
+        if (symbolsToFetch.length > 0) try {
             // yahoo-finance2 'quote' can accept an array but it's often safer to do individual or small batches if they vary widely
             // However, 'quote' supports array.
             // @ts-ignore - type definitions might be mismatched for instantiated client
-            const quotes = await yahooFinance.quote(symbolsToFetch, { fields: ['symbol', 'regularMarketPrice', 'currency'] });
+            const quotes = await yahooFinance.quote(symbolsToFetch, {
+                fields: ['symbol', 'regularMarketPrice', 'currency', 'regularMarketTime'],
+            });
 
             // Should return array if multiple symbols, but check
             const quotesArray = Array.isArray(quotes) ? quotes : [quotes];
@@ -84,7 +91,9 @@ export class PriceService {
                 if (quote.regularMarketPrice !== undefined && quote.currency) {
                     const data = {
                         price: quote.regularMarketPrice,
-                        currency: quote.currency
+                        currency: quote.currency,
+                        asOf: this.quoteTimestamp(quote.regularMarketTime),
+                        source: 'yahoo' as const,
                     };
 
                     // Update cache for the TICKER
@@ -114,7 +123,7 @@ export class PriceService {
 
     private async fetchFundPricesFromEodhd(
         symbols: string[],
-        results: Record<string, { price: number, currency: string }>,
+        results: Record<string, PriceQuote>,
         now: number,
     ): Promise<void> {
         const eodhdApiKey = process.env.EODHD_API_KEY?.trim();
@@ -148,13 +157,32 @@ export class PriceService {
                 if (!Number.isFinite(price) || price <= 0) return;
 
                 const currency = (latest as { currency?: string } | null)?.currency || 'EUR';
-                const data = { price, currency };
+                const rawDate = (latest as { date?: string } | null)?.date;
+                const data: PriceQuote = {
+                    price,
+                    currency,
+                    asOf: rawDate ? `${rawDate}T00:00:00.000Z` : null,
+                    source: 'eodhd',
+                };
                 this.cache[isin] = { ...data, timestamp: now };
                 results[isin] = data;
             } catch (error) {
                 console.error(`Error fetching fund ${isin} from EODHD:`, error);
             }
         }));
+    }
+
+    private quoteTimestamp(value: unknown): string | null {
+        if (value instanceof Date && !Number.isNaN(value.getTime())) return value.toISOString();
+        if (typeof value === 'number' && Number.isFinite(value)) {
+            const milliseconds = value > 10_000_000_000 ? value : value * 1_000;
+            return new Date(milliseconds).toISOString();
+        }
+        if (typeof value === 'string') {
+            const parsed = new Date(value);
+            if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
+        }
+        return null;
     }
 
     async search(query: string) {

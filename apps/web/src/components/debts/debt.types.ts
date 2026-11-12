@@ -22,9 +22,11 @@ export type Debt = {
     currency: 'EUR' | 'USD';
     status: DebtStatus;
     notes: string | null;
+    detectedPayments: number;
+    lastDetectedPaymentAt: string | null;
 };
 
-export type DebtFormData = Omit<Debt, 'id' | 'remainingPayments' | 'paidAmount' | 'progressPercent'>;
+export type DebtFormData = Omit<Debt, 'id' | 'remainingPayments' | 'paidAmount' | 'progressPercent' | 'detectedPayments' | 'lastDetectedPaymentAt'>;
 
 export type DebtScheduleRow = {
     id: string;
@@ -34,4 +36,17 @@ export type DebtScheduleRow = {
     principalAmount: number;
     interestAmount: number;
     balanceAfter: number;
+};
+
+export type DebtPayment = {
+    id: string;
+    installment: number;
+    paidAt: string;
+    amount: number;
+    principalAmount: number;
+    interestAmount: number;
+    detectedAt: string;
+    description: string | null;
+    merchantName: string | null;
+    bankTransactionId: string;
 };

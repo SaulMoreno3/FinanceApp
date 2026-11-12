@@ -47,13 +47,13 @@ export function AccountMenu({ onNavigate }: AccountMenuProps) {
             <DropdownMenuTrigger asChild>
                 <button
                     type="button"
-                    className="group flex w-full items-center gap-3 rounded-xl border border-sidebar-border bg-sidebar-accent/40 p-2.5 text-left outline-none transition-colors hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-sidebar-ring data-[state=open]:bg-sidebar-accent"
-                    aria-label="Open account menu"
+                    className="group flex w-full items-center gap-3 rounded-lg p-2 text-left outline-none transition-colors hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-sidebar-ring data-[state=open]:bg-sidebar-accent"
+                    aria-label="Abrir menú de cuenta"
                 >
                     <UserAvatar user={user} className="h-10 w-10" />
                     <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-semibold text-sidebar-foreground">
-                            {user?.name || "Your account"}
+                            {user?.name || "Mi cuenta"}
                         </span>
                         <span className="block truncate text-xs text-sidebar-foreground/60">{user?.email}</span>
                     </span>
@@ -70,26 +70,26 @@ export function AccountMenu({ onNavigate }: AccountMenuProps) {
                 <DropdownMenuLabel className="flex items-center gap-3 px-2 py-2.5 font-normal">
                     <UserAvatar user={user} className="h-9 w-9 rounded-lg" iconClassName="h-4 w-4" />
                     <span className="min-w-0">
-                        <span className="block truncate text-sm font-semibold">{user?.name || "Your account"}</span>
+                        <span className="block truncate text-sm font-semibold">{user?.name || "Mi cuenta"}</span>
                         <span className="block truncate text-xs text-muted-foreground">{user?.email}</span>
                     </span>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onSelect={() => goTo("/settings")} className="cursor-pointer py-2">
                     <Settings />
-                    Account settings
+                    Ajustes de cuenta
                 </DropdownMenuItem>
                 <DropdownMenuSub>
                     <DropdownMenuSubTrigger className="cursor-pointer py-2">
                         {theme === "dark" ? <Moon /> : theme === "light" ? <Sun /> : <Laptop />}
-                        Appearance
+                        Apariencia
                     </DropdownMenuSubTrigger>
                     <DropdownMenuSubContent className="min-w-40 rounded-xl p-1.5">
                         <DropdownMenuRadioGroup value={theme} onValueChange={(value) => setTheme(value as "light" | "dark" | "system")}>
                             {[
-                                { value: "light", label: "Light", icon: Sun },
-                                { value: "dark", label: "Dark", icon: Moon },
-                                { value: "system", label: "System", icon: Laptop },
+                                { value: "light", label: "Claro", icon: Sun },
+                                { value: "dark", label: "Oscuro", icon: Moon },
+                                { value: "system", label: "Sistema", icon: Laptop },
                             ].map((option) => (
                                 <DropdownMenuRadioItem key={option.value} value={option.value} className="cursor-pointer py-2 pl-2 pr-8 [&>span]:hidden">
                                     <option.icon />
@@ -102,7 +102,7 @@ export function AccountMenu({ onNavigate }: AccountMenuProps) {
                 </DropdownMenuSub>
                 <DropdownMenuItem onSelect={() => goTo("/support")} className="cursor-pointer py-2">
                     <CircleHelp />
-                    Help & support
+                    Ayuda y soporte
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
@@ -114,7 +114,7 @@ export function AccountMenu({ onNavigate }: AccountMenuProps) {
                     className="cursor-pointer py-2 text-destructive focus:bg-destructive/10 focus:text-destructive"
                 >
                     <LogOut />
-                    {isLoggingOut ? "Signing out…" : "Sign out"}
+                    {isLoggingOut ? "Cerrando sesión…" : "Cerrar sesión"}
                 </DropdownMenuItem>
             </DropdownMenuContent>
         </DropdownMenu>

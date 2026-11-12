@@ -11,6 +11,8 @@ COPY apps/tauri-desktop/package.json apps/tauri-desktop/package.json
 RUN pnpm install --frozen-lockfile
 
 COPY apps/web apps/web
+# Shared pure property types and calculations used by the frontend.
+COPY apps/api/src/modules/real-estate apps/api/src/modules/real-estate
 ARG VITE_API_URL=/api
 ENV VITE_API_URL=${VITE_API_URL}
 RUN pnpm --filter web build

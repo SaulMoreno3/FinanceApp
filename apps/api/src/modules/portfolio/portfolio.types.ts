@@ -4,13 +4,17 @@ export interface StockTrade {
     symbol: string;
     isin?: string | null;
     name?: string | null;
+    assetType?: string | null;
     currency: string;
     quantity: number;
     price: number;
+    value?: number;
     side: 'Buy' | 'Sell';
     fees: number;
     commission: number;
     type?: string;
+    eurValue?: number | null;
+    conversionRate?: number | null;
     costBasisOverride?: number | null;
 }
 
@@ -27,6 +31,7 @@ export interface CalculationResult {
     symbol: string;
     isin?: string | null;
     name?: string | null;
+    assetType?: string | null;
     currency: string;
     realizedGain: number;     // Total profit/loss from sold shares
     remainingShares: number;  // Shares currently held

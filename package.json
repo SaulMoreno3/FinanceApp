@@ -4,7 +4,7 @@
   "description": "Private personal finance tracker",
   "main": "index.js",
   "scripts": {
-    "test": "pnpm --filter api test",
+    "test": "pnpm --filter api test && pnpm --filter web test",
     "dev": "pnpm --parallel --filter api --filter web dev",
     "dev:web": "pnpm --filter web dev",
     "dev:api": "pnpm --filter api dev",

@@ -28,6 +28,7 @@ services:
       DB_USER: ${DB_USER}
       DB_PASSWORD: ${DB_PASSWORD}
       DATABASE_URL: postgresql://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}?schema=public
+      REGISTRATION_CODE: ${REGISTRATION_CODE:-}
       JWT_SECRET: ${JWT_SECRET}
       PEPPER: ${PEPPER}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
@@ -42,6 +43,8 @@ services:
       CORS_ORIGINS: ${CORS_ORIGINS:-https://finance.saulmoreno.es,http://localhost:8080,http://127.0.0.1:8080}
     volumes:
       - ./data/uploads:/app/uploads
+      # pnpm runs the API from /app/apps/api; persist new and legacy absolute paths.
+      - ./data/uploads:/app/apps/api/uploads
     depends_on:
       db:
         condition: service_healthy

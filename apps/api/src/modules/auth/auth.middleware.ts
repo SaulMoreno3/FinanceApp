@@ -23,7 +23,7 @@ export const authenticateToken = (req: AuthRequest, res: Response, next: NextFun
         return;
     }
 
-    jwt.verify(token, getJwtSecret(), async (err: VerifyErrors | null, user: JwtPayload | string | undefined) => {
+    jwt.verify(token, getJwtSecret(), { algorithms: ['HS256'] }, async (err: VerifyErrors | null, user: JwtPayload | string | undefined) => {
         if (err) {
             res.sendStatus(403);
             return;

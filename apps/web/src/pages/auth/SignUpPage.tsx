@@ -17,7 +17,8 @@ export default function SignUpPage() {
     const [formData, setFormData] = useState({
         email: "",
         password: "",
-        confirmPassword: ""
+        confirmPassword: "",
+        registrationCode: ""
     });
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -37,7 +38,8 @@ export default function SignUpPage() {
         try {
             const data = await postAPI<{ token: string }>("/auth/register", {
                 email: formData.email,
-                password: formData.password
+                password: formData.password,
+                registrationCode: formData.registrationCode
             });
             if (data.token) {
                 setToken(data.token);
@@ -136,17 +138,25 @@ export default function SignUpPage() {
                                 </div>
 
                                 <div className="space-y-2">
-                                    <Label htmlFor="password">Password</Label>
+                                    <Label htmlFor="registrationCode">Código de acceso</Label>
+                                    <Input id="registrationCode" type="password" value={formData.registrationCode} onChange={handleChange} maxLength={128} autoComplete="off" required />
+                                    <p className="text-xs text-muted-foreground">Necesitas el código facilitado por el propietario para crear tu cuenta.</p>
+                                </div>
+
+                                <div className="space-y-2">
+                                    <Label htmlFor="password">Password · mínimo 12 caracteres</Label>
                                     <div className="relative group">
                                         <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                                         <Input
                                             id="password"
                                             type="password"
+                                            minLength={12}
+                                            maxLength={128}
+                                            autoComplete="new-password"
                                             placeholder="••••••••"
                                             value={formData.password}
                                             onChange={handleChange}
                                             required
-                                            minLength={6}
                                             className="pl-10 h-11 bg-secondary/30 border-border/50 focus:border-primary focus:ring-1 focus:ring-primary transition-all"
                                         />
                                     </div>
@@ -159,11 +169,13 @@ export default function SignUpPage() {
                                         <Input
                                             id="confirmPassword"
                                             type="password"
+                                            minLength={12}
+                                            maxLength={128}
+                                            autoComplete="new-password"
                                             placeholder="••••••••"
                                             value={formData.confirmPassword}
                                             onChange={handleChange}
                                             required
-                                            minLength={6}
                                             className="pl-10 h-11 bg-secondary/30 border-border/50 focus:border-primary focus:ring-1 focus:ring-primary transition-all"
                                         />
                                     </div>

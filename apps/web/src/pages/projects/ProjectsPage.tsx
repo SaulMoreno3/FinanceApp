@@ -197,8 +197,8 @@ export default function ProjectsPage() {
     };
 
     return (
-        <div className="min-h-full bg-muted/20 p-4 md:p-6">
-            <div className="mx-auto max-w-[1500px] space-y-6">
+        <div className="min-h-full bg-background p-4 md:p-8">
+            <div className="mx-auto w-full max-w-7xl space-y-6">
                 {error && <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">{error}</div>}
 
                 <div className="grid items-start gap-6 xl:grid-cols-[280px_minmax(0,1fr)]">

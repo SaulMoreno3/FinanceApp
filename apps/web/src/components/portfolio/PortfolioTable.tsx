@@ -6,111 +6,66 @@ import {
     TableHeader,
     TableRow,
 } from "@/components/ui/table";
-import type { Holding } from "@/components/portfolio/portfolio.types";
+import type { Holding, PortfolioValuation } from "@/components/portfolio/portfolio.types";
 import { Link } from "react-router-dom";
 
-interface PortfolioTableProps {
-    holdings: Holding[];
-    prices?: Record<string, { price: number; currency: string }>;
+const euros = new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 2 });
+const nativeMoney = (value: number, currency: string) => new Intl.NumberFormat("es-ES", {
+    style: "currency",
+    currency,
+    maximumFractionDigits: 4,
+}).format(value);
+
+function Result({ value, percent }: { value: number | null; percent?: number | null }) {
+    if (value === null) return <span className="text-muted-foreground">No disponible</span>;
+    return (
+        <span className={value >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"}>
+            {value >= 0 ? "+" : ""}{euros.format(value)}
+            {percent !== undefined && percent !== null && (
+                <span className="ml-1.5 text-xs font-normal opacity-80">{percent >= 0 ? "+" : ""}{percent.toFixed(2)} %</span>
+            )}
+        </span>
+    );
 }
 
-export function PortfolioTable({ holdings, prices }: PortfolioTableProps) {
-    const usdEurRate = prices?.["USDEUR=X"]?.price || 0.95; // Default fallback if missing
-
+export function PortfolioTable({ holdings, valuation }: { holdings: Holding[]; valuation: PortfolioValuation }) {
     return (
-        <div className="rounded-md border overflow-x-auto">
-            <Table className="min-w-[800px]">
+        <div className="overflow-x-auto">
+            <Table className="min-w-[820px]">
                 <TableHeader>
-                    <TableRow>
+                    <TableRow className="hover:bg-transparent">
                         <TableHead>Activo</TableHead>
-                        <TableHead className="text-right">Quantity</TableHead>
-                        <TableHead className="text-right">Avg Cost</TableHead>
-                        <TableHead className="text-right">Current Price</TableHead>
-                        <TableHead className="text-right">Market Value</TableHead>
-                        <TableHead className="text-right">Total Cost</TableHead>
-                        <TableHead className="text-right">Realized Gain</TableHead>
-                        <TableHead className="text-right">Unrealized Gain</TableHead>
+                        <TableHead className="text-right">Unidades</TableHead>
+                        <TableHead className="text-right">Último precio</TableHead>
+                        <TableHead className="text-right">Valor en EUR</TableHead>
+                        <TableHead className="text-right">Coste en EUR</TableHead>
+                        <TableHead className="text-right">Resultado</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
                     {holdings.map((holding) => {
-                        const quote = prices?.[holding.symbol];
-                        let marketValue = 0;
-                        let priceDisplay = '-';
-
-                        // Determine display symbol based on holding currency (from backend)
-                        const currencySymbol = holding.currency === 'USD' ? '$' : '€';
-
-                        if (quote && holding.remainingShares > 0) {
-                            // If quote matches holding currency, use as is.
-                            // If quote is USD and holding is EUR, convert (not expected here if we skipped conversion).
-                            // If quote is USD and holding is USD, use as is.
-
-                            let priceVal = quote.price;
-
-                            // Mismatch handling (e.g. Quote is EUR, Holding is USD? Unlikely for US stocks).
-                            // We trust holding.currency as the "Account Currency" for this asset.
-
-                            if (quote.currency === 'USD' && holding.currency === 'EUR') {
-                                // We have a rate?
-                                priceVal = quote.price * usdEurRate;
-                            } else if (quote.currency === 'EUR' && holding.currency === 'USD') {
-                                // Inverse?
-                                priceVal = quote.price / usdEurRate;
-                            }
-
-                            priceDisplay = `${currencySymbol}${quote.price.toFixed(2)}`;
-                            // Actually show the value in the holding's currency
-                            if (quote.currency !== holding.currency) {
-                                // Simplified: Just use the Converted Price for display
-                                priceDisplay = `${currencySymbol}${priceVal.toFixed(2)}`;
-                            }
-
-                            marketValue = priceVal * holding.remainingShares;
-                        }
-
-                        const unrealizedGain = marketValue > 0 ? marketValue - holding.totalCostBasis : 0;
-
+                        const position = valuation.positions[holding.symbol];
+                        const quoteDate = position?.quote.asOf
+                            ? new Intl.DateTimeFormat("es-ES", { dateStyle: "medium" }).format(new Date(position.quote.asOf))
+                            : null;
                         return (
                             <TableRow key={holding.symbol}>
-                                <TableCell className="font-medium">
-                                    <Link to={`/portfolio/${holding.symbol}`} className="hover:underline text-blue-500">
+                                <TableCell className="py-4">
+                                    <Link to={`/portfolio/${holding.symbol}`} className="font-medium underline-offset-4 hover:underline">
                                         {holding.name || holding.symbol}
                                     </Link>
-                                    <div className="text-xs text-muted-foreground">
-                                        {holding.symbol}
-                                        {holding.isin ? ` · ISIN ${holding.isin}` : ''}
+                                    <div className="mt-0.5 text-xs text-muted-foreground">
+                                        {holding.symbol}{holding.isin ? ` / ISIN ${holding.isin}` : ""}
                                     </div>
                                 </TableCell>
-                                <TableCell className="text-right">
-                                    {holding.remainingShares > 0 ? holding.remainingShares.toFixed(4) : '-'}
+                                <TableCell className="text-right tabular-nums">{holding.remainingShares.toLocaleString("es-ES", { maximumFractionDigits: 6 })}</TableCell>
+                                <TableCell className="text-right tabular-nums">
+                                    {position ? nativeMoney(position.quote.price, position.quote.currency) : <span className="text-muted-foreground">Sin cotización</span>}
+                                    {position && <div className="mt-0.5 text-[11px] text-muted-foreground">{position.quote.source.toUpperCase()} / {quoteDate ?? "sin fecha"}</div>}
                                 </TableCell>
-                                <TableCell className="text-right">
-                                    {holding.remainingShares > 0 ? `${currencySymbol}${holding.averageCost.toFixed(2)}` : '-'}
-                                </TableCell>
-                                <TableCell className="text-right">
-                                    {priceDisplay}
-                                </TableCell>
-                                <TableCell className="text-right font-medium">
-                                    {marketValue > 0 ? `${currencySymbol}${marketValue.toFixed(2)}` : '-'}
-                                </TableCell>
-                                <TableCell className="text-right text-muted-foreground">
-                                    {holding.remainingShares > 0 ? `${currencySymbol}${holding.totalCostBasis.toFixed(2)}` : '-'}
-                                </TableCell>
-                                <TableCell className={`text-right ${holding.realizedGain >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                                    {holding.realizedGain !== 0 ? `${holding.realizedGain > 0 ? '+' : ''}${currencySymbol}${holding.realizedGain.toFixed(2)}` : '-'}
-                                </TableCell>
-                                <TableCell className={`text-right ${unrealizedGain >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                                    {marketValue > 0 ? (
-                                        <>
-                                            {unrealizedGain > 0 ? '+' : ''}{currencySymbol}{unrealizedGain.toFixed(2)}
-                                            <br />
-                                            <span className="text-xs opacity-80">
-                                                ({unrealizedGain > 0 ? '+' : ''}{((unrealizedGain / holding.totalCostBasis) * 100).toFixed(2)}%)
-                                            </span>
-                                        </>
-                                    ) : '-'}
-                                </TableCell>
+                                <TableCell className="text-right font-medium tabular-nums">{position ? euros.format(position.marketValueEur) : "-"}</TableCell>
+                                <TableCell className="text-right text-muted-foreground tabular-nums">{position?.costBasisEur == null ? "-" : euros.format(position.costBasisEur)}</TableCell>
+                                <TableCell className="text-right font-medium tabular-nums"><Result value={position?.unrealizedGainEur ?? null} percent={position?.unrealizedGainPercent} /></TableCell>
                             </TableRow>
                         );
                     })}
@@ -122,34 +77,19 @@ export function PortfolioTable({ holdings, prices }: PortfolioTableProps) {
 
 export function ClosedPositionsTable({ holdings }: { holdings: Holding[] }) {
     return (
-        <div className="overflow-hidden rounded-md border">
-            <div className="grid grid-cols-1 border-b bg-muted/20 text-sm font-medium text-muted-foreground lg:grid-cols-2">
-                <div className="px-5 py-3">Asset</div>
-                <div className="hidden px-5 py-3 text-right lg:block">Realized Profit</div>
-            </div>
-            <div className="grid grid-cols-1 lg:grid-cols-2">
-                {holdings.map((holding) => {
-                    const currencySymbol = holding.currency === 'USD' ? '$' : '€';
-                    const gain = holding.realizedGain;
-
-                    return (
-                        <div key={holding.symbol} className="flex items-center justify-between gap-4 border-b px-5 py-4 transition-colors hover:bg-muted/20 lg:min-h-[88px] lg:even:border-l">
-                            <div className="min-w-0">
-                                <Link to={`/portfolio/${holding.symbol}`} className="font-medium text-blue-500 hover:underline">
-                                    {holding.name || holding.symbol}
-                                </Link>
-                                <div className="text-xs text-muted-foreground">
-                                    {holding.symbol}
-                                    {holding.isin ? ` · ISIN ${holding.isin}` : ''}
-                                </div>
-                            </div>
-                            <div className={`shrink-0 text-right font-medium ${gain >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                                {gain >= 0 ? '+' : ''}{currencySymbol}{gain.toFixed(2)}
-                            </div>
+        <div className="divide-y divide-border">
+            {holdings.map((holding) => {
+                const gain = holding.realizedGainEur ?? (holding.currency === "EUR" ? holding.realizedGain : null);
+                return (
+                    <div key={holding.symbol} className="flex items-center justify-between gap-4 py-4">
+                        <div className="min-w-0">
+                            <Link to={`/portfolio/${holding.symbol}`} className="font-medium underline-offset-4 hover:underline">{holding.name || holding.symbol}</Link>
+                            <div className="mt-0.5 text-xs text-muted-foreground">{holding.symbol}{holding.isin ? ` / ISIN ${holding.isin}` : ""}</div>
                         </div>
-                    );
-                })}
-            </div>
+                        <div className="shrink-0 text-right font-medium tabular-nums"><Result value={gain} /></div>
+                    </div>
+                );
+            })}
         </div>
     );
 }

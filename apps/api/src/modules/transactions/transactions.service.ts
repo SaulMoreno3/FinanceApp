@@ -1,8 +1,20 @@
 import { Currency } from '../../generated/prisma/enums';
 import { prisma } from '../../common/db/prisma';
 import type { GetTransactionsQuery } from './transactions.schema';
+import { randomUUID } from 'node:crypto';
+import { manualTradeSchema } from './manual-trade.schema';
 
 export class TransactionsService {
+    async createTrade(userId:string,input:unknown) {
+        const trade=manualTradeSchema.parse(input);
+        const value=trade.quantity*trade.price;
+        const rate=trade.currency==='EUR'?1:trade.conversionRate??(trade.eurCost===undefined?null:trade.eurCost/value);
+        const eurValue=trade.currency==='EUR'?value:trade.eurCost??(rate===null?null:value*rate);
+        return prisma.stockTrade.create({data:{id:randomUUID(),userId,date:trade.date,symbol:trade.symbol,
+            assetType:trade.assetType,currency:trade.currency,side:trade.side,type:'Trade - Market',
+            quantity:trade.quantity,price:trade.price,value,fees:trade.fees,commission:trade.commission,
+            conversionRate:rate,eurCost:eurValue,eurValue,source:'MANUAL',updatedAt:new Date()}});
+    }
     async getTransactions(userId: string, filters: GetTransactionsQuery) {
         const { page, limit, from, to, currency, symbol, type } = filters;
         const where = {
@@ -148,42 +160,12 @@ export class TransactionsService {
         }
     }
 
-    private async inferTradeConversionsFromNearestCashRate(userId: string) {
-        const [rates, trades] = await Promise.all([
-            prisma.cashTransfer.findMany({
-                where: {
-                    userId,
-                    currency: { not: Currency.EUR },
-                    type: { in: ['Cash top-up', 'Cash withdrawal'] },
-                    conversionRate: { not: null },
-                    skippedConversion: false,
-                },
-                select: { date: true, currency: true, conversionRate: true },
-                orderBy: { date: 'asc' },
-            }),
-            prisma.stockTrade.findMany({
-                where: { userId, currency: { not: Currency.EUR }, conversionRate: null },
-                select: { id: true, date: true, currency: true, value: true },
-                orderBy: { date: 'asc' },
-            }),
-        ]);
-
-        for (const trade of trades) {
-            const candidates = rates
-                .filter(rate => rate.currency === trade.currency && rate.conversionRate)
-                .map(rate => ({
-                    rate: Number(rate.conversionRate),
-                    distance: Math.abs(rate.date.getTime() - trade.date.getTime()),
-                }))
-                .sort((left, right) => left.distance - right.distance);
-            const nearest = candidates[0];
-            if (!nearest || nearest.distance > 90 * 24 * 60 * 60 * 1000) continue;
-            const eurValue = Math.abs(Number(trade.value)) * nearest.rate;
-            await prisma.stockTrade.update({
-                where: { id: trade.id },
-                data: { eurCost: eurValue, eurValue, conversionRate: nearest.rate },
-            });
-        }
+    private async inferTradeConversionsFromNearestCashRate(_userId: string) {
+        // Deliberately do not infer a trade's FX from the nearest cash
+        // movement. A cash conversion can settle several days later, and the
+        // nearest movement may belong to another asset or another sale. The
+        // importer/manual conversion stores the exact trade rate; unresolved
+        // trades remain pending instead of silently corrupting realised gains.
     }
 
     async updateTransactionConversion(userId: string, id: string, eurCost: number) {

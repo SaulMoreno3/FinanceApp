@@ -78,7 +78,8 @@ export class AuthController {
         }
     }
 
-    async logout(req: Request, res: Response) {
+    async logout(req: AuthRequest, res: Response, next: NextFunction) {
+        try { await authService.logout(req.user!.id); } catch (error) { next(error); return; }
         res.clearCookie('token', {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',

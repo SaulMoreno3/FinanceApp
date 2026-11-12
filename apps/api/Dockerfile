@@ -21,7 +21,7 @@ FROM node:24-bookworm-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends openssl \
+    && apt-get install -y --no-install-recommends openssl qpdf \
     && rm -rf /var/lib/apt/lists/* \
     && npm install --global pnpm@10.26.0
 

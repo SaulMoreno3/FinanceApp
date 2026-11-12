@@ -7,6 +7,11 @@ import { salaryPasswordService } from '../salary-password/salary-password.servic
 import { decrypt } from '../../common/utils/encryption';
 import { standardFontDataUrl } from '../../common/utils/pdf';
 import * as pdfjsLib from 'pdfjs-dist/legacy/build/pdf.mjs';
+import { execFile } from 'child_process';
+import { promisify } from 'util';
+import crypto from 'crypto';
+
+const execFilePromise = promisify(execFile);
 
 export class SalaryController {
     async create(req: any, res: Response) {
@@ -79,6 +84,7 @@ export class SalaryController {
     }
 
     async file(req: any, res: Response) {
+        let temporaryDecryptedPath: string | null = null;
         try {
             const userId = req.user!.id;
             const result = await salaryService.findById(userId, req.params.id);
@@ -92,10 +98,45 @@ export class SalaryController {
                 return res.status(404).json({ error: 'Salary document not found' });
             }
 
+            let pathToServe = filePath;
+
+            // Older payslips may still be encrypted. Decrypt only a temporary
+            // copy for the authenticated viewer and keep the stored original
+            // untouched.
+            const savedPasswords = await salaryPasswordService.findAllWithSecrets(userId);
+            for (const savedPassword of savedPasswords) {
+                const candidatePath = `${filePath}.view-${crypto.randomUUID()}.pdf`;
+                try {
+                    const password = decrypt(savedPassword.encryptedPassword, savedPassword.iv);
+                    await execFilePromise('qpdf', [
+                        `--password=${password}`,
+                        '--decrypt',
+                        filePath,
+                        candidatePath,
+                    ]);
+                    temporaryDecryptedPath = candidatePath;
+                    pathToServe = candidatePath;
+                    break;
+                } catch {
+                    if (fs.existsSync(candidatePath)) {
+                        fs.unlinkSync(candidatePath);
+                    }
+                    temporaryDecryptedPath = null;
+                }
+            }
+
             res.setHeader('Content-Type', 'application/pdf');
             res.setHeader('Content-Disposition', 'inline');
             res.setHeader('Cache-Control', 'private, no-store');
-            return res.sendFile(filePath);
+            return res.sendFile(path.resolve(pathToServe), (error) => {
+                if (temporaryDecryptedPath && fs.existsSync(temporaryDecryptedPath)) {
+                    fs.unlinkSync(temporaryDecryptedPath);
+                }
+                if (error && !res.headersSent) {
+                    const statusCode = (error as NodeJS.ErrnoException & { statusCode?: number }).statusCode ?? 500;
+                    res.status(statusCode).json({ error: 'Unable to send salary document' });
+                }
+            });
         } catch (error) {
             console.error(error);
             return res.status(500).json({ error: 'Internal Server Error' });

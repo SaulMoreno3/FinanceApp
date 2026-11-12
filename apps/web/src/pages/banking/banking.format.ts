@@ -1,3 +1,6 @@
+export const isInternalBankTransfer = (description: string | null | undefined) =>
+    /fondos monetarios flexibles|savings vault topup|cuenta flexible/i.test(description ?? '');
+
 const text = (...values: Array<string | null | undefined>) => values.filter(Boolean).join(' ').toLocaleLowerCase('es-ES');
 
 export function transactionLabel(merchantName: string | null, description: string | null) {
@@ -5,6 +8,7 @@ export function transactionLabel(merchantName: string | null, description: strin
 }
 
 export function transactionCategory(category: string | null, merchantName: string | null, description: string | null) {
+    if (isInternalBankTransfer(description)) return 'Traspaso entre mis cuentas';
     const haystack = text(merchantName, description);
     const code = category?.toUpperCase();
 

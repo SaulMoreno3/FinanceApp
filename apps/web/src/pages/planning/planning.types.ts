@@ -1,0 +1,18 @@
+export type SalarySchedule={day:number;weekendAdjustment:'NONE'|'PREVIOUS'|'NEXT';anchorMonth:string};
+export type Recurring = {salarySchedule?:SalarySchedule|null;id:string;name:string;amount:number;currency:string;kind:'SUBSCRIPTION'|'EXPENSE'|'INCOME';cadence:'WEEKLY'|'MONTHLY'|'QUARTERLY'|'YEARLY';nextDate:string;endDate:string|null;active:boolean;merchantKey:string|null;notes:string};
+export type Plan={reserve:number;variableMonthly:number;includeDebts:boolean;includeProperties:boolean;recurring:Recurring[];dismissedMerchants:string[];transactionOverrides:Record<string,{kind:'AUTO'|'TRANSFER'|'INCOME'|'EXPENSE';category:string}>;acknowledgedIssues:string[]};
+export type Movement={id:string;date:string;amount:number;currency:string;description:string|null;merchantName:string|null;displayCategory:string;kind:string};
+export type Analysis={month:string;income:number;spent:number;saved:number;savingRate:number|null;previous:number;change:number|null;categories:{name:string;amount:number}[];merchants:{name:string;amount:number}[];history:{month:string;amount:number}[];otherCurrencies:string[];transfers:number;duplicates:string[];transactions:Movement[]};
+export type Candidate={merchantKey:string;name:string;currency:string;amount:number;cadence:Recurring['cadence'];nextDate:string;count:number;confidence:string;lastDate:string;previousAmount:number;priceChange:number;evidence:{id:string;date:string;amount:number}[]};
+export type Overview={version:number;plan:Plan;today:string;fingerprint:string;analysis:Analysis;candidates:Candidate[];recurring:(Recurring&{nextDueDate:string|null;lastCharge:{date:string;amount:number}|null;priceChange:number})[];
+ liquidity:{balance:number;creditPending:number;unknownCreditBalances:number;reserve:number;available:number;netWorth:number;invested:number;goods:number;debt:number;accounts:{name:string|null;currency:string;balance:number|null;updatedAt:string|null}[];scope:string};
+ forecast:{days:{date:string;balance:number;available:number}[];events:{date:string;name:string;amount:number;source:string}[];minimum:number;endBalance:number;firstBelowReserve:string|null;assumptions:{variableMonthly:number;variableSource:'PLAN'|'HISTORICAL_MEDIAN';variableEvidence:{month:string;amount:number}[];salarySource:'INFERRED_BANK_PAYMENTS'|'NONE'}};
+ properties:{id:string;name:string;expectedRent:number;operatingExpenses:number;operatingProfit:number;debtService:number;netCashFlow:number;grossYield:number|null;netYield:number|null;cashOnCash:number|null;monthsWithoutRent:number}[];
+ issues:{id:string;title:string;detail:string;href:string;acknowledged:boolean}[];
+ closings:{month:string;reviewedAt:string;changed:boolean;snapshot:{analysis:Analysis;netWorthAtReview:number;debtAtReview:number;recordedAt:string}}[];
+ coverage:{firstDate:string|null;lastDate:string|null;movements:number;pending:number};salarySuggestion:{name:string;amount:number;nextDate:string|null;day:number|null;confidence:string;reason:string;schedule:SalarySchedule|null;range:{from:string;to:string}|null;merchantKey:string|null;evidence:{id:string;date:string;amount:number}[]}|null;
+};
+export const money=(n:number,currency='EUR')=>new Intl.NumberFormat('es-ES',{style:'currency',currency}).format(n);
+export const dateLabel=(date:string|null)=>date?new Date(date.length===10?date+'T12:00:00Z':date).toLocaleDateString('es-ES'):'Sin datos';
+export const cadences={WEEKLY:'Semanal',MONTHLY:'Mensual',QUARTERLY:'Trimestral',YEARLY:'Anual'};
+export const monthlyFactor={WEEKLY:52/12,MONTHLY:1,QUARTERLY:1/3,YEARLY:1/12};

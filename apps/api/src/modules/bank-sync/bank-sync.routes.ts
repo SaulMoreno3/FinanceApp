@@ -10,6 +10,7 @@ router.get('/truelayer/callback', bankSyncController.callback.bind(bankSyncContr
 router.use(authenticateToken);
 router.get('/status', bankSyncController.status.bind(bankSyncController));
 router.get('/overview', bankSyncController.overview.bind(bankSyncController));
+router.get('/balance-history', bankSyncController.balanceHistory.bind(bankSyncController));
 router.get('/transactions', bankSyncController.transactions.bind(bankSyncController));
 router.get('/truelayer/connect', bankSyncController.connect.bind(bankSyncController));
 router.post('/sync', bankSyncController.sync.bind(bankSyncController));

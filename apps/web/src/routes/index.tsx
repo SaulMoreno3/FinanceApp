@@ -7,6 +7,7 @@ import { AuthProvider } from "@/components/common/AuthContext";
 import ProtectedRoute from "@/components/common/ProtectedRoute";
 import RouteErrorBoundary from "@/components/common/RouteErrorBoundary";
 
+const PlanningPage = lazy(() => import("@/pages/planning/PlanningPage"));
 const LoginPage = lazy(() => import("@/pages/auth/LoginPage"));
 const SignUpPage = lazy(() => import("@/pages/auth/SignUpPage"));
 const DashboardPage = lazy(() => import("@/pages/dashboard/DashboardPage"));
@@ -16,6 +17,7 @@ const ImportPage = lazy(() => import("@/pages/import-data/ImportPage"));
 const NetWorthPage = lazy(() => import("@/pages/net-worth/NetWorthPage"));
 const SalaryPage = lazy(() => import("@/pages/salary/SalaryPage"));
 const SalaryHistoryPage = lazy(() => import("@/pages/salary/SalaryHistoryPage"));
+const RealEstatePage = lazy(() => import("@/pages/real-estate/RealEstatePage"));
 const ReportsPage = lazy(() => import("@/pages/reports/ReportsPage"));
 const ProjectsPage = lazy(() => import("@/pages/projects/ProjectsPage"));
 const AccountSettingsPage = lazy(() => import("@/pages/settings/AccountSettingsPage"));
@@ -25,6 +27,7 @@ const DebtsPage = lazy(() => import("@/pages/debts/DebtsPage"));
 const DebtDetailPage = lazy(() => import("@/pages/debts/DebtDetailPage"));
 const BankingPage = lazy(() => import("@/pages/banking/BankingPage"));
 const BankingHistoryPage = lazy(() => import("@/pages/banking/BankingHistoryPage"));
+const ExpensesPage = lazy(() => import("@/pages/expenses/ExpensesPage"));
 
 const deferred = (page: ReactNode) => <Suspense fallback={null}>{page}</Suspense>;
 
@@ -95,6 +98,9 @@ const router = createBrowserRouter([
                   { path: ":id", element: deferred(<DebtDetailPage />) },
                 ],
               },
+              { path: "planning", element: deferred(<PlanningPage />) },
+              { path: "expenses", element: deferred(<ExpensesPage />) },
+              { path: "real-estate", element: deferred(<RealEstatePage />) },
               {
                 path: "reports",
                 element: deferred(<ReportsPage />),

@@ -3,11 +3,12 @@ import { Eye, FileText, Loader2, Plus, Trash2, Upload } from "lucide-react";
 import { fetchAPI, fetchBlob, postAPI } from "@/lib/api";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { estimateAragonIrpf } from "./tax-estimator";
+import TaxInfoDialog from "./TaxInfoDialog";
+import { estimateAragonIrpf, SUPPORTED_TAX_YEARS } from "./tax-estimator";
 
 interface TaxReturn {
     id: string;
@@ -32,9 +33,12 @@ interface AnnualSummary {
     employmentIncome: number;
     selfEmploymentIncome: number;
     savingsIncome: number;
+    cashIncome?: { dividends:number; interest:number; records:number; estimatedConversions:number; pendingByCurrency:Record<string,number> };
     capitalGains: number;
     socialSecurity: number;
     workExpenses: number;
+    operationalTaxPaid: number;
+    issues?: string[];
 }
 
 interface TaxReturnForm {
@@ -43,6 +47,7 @@ interface TaxReturnForm {
     status: "Draft" | "Filed" | "Amended";
     totalIncome: string;
     taxPaid: string;
+    finalTaxResult: string;
     filingDate: string;
     notes: string;
 }
@@ -53,6 +58,7 @@ const initialForm: TaxReturnForm = {
     status: "Draft",
     totalIncome: "0",
     taxPaid: "0",
+    finalTaxResult: "",
     filingDate: "",
     notes: "",
 };
@@ -132,6 +138,7 @@ export default function TaxesPage() {
         body.append("status", form.status);
         body.append("totalIncome", form.totalIncome || "0");
         body.append("taxPaid", form.taxPaid || "0");
+        if (form.finalTaxResult !== "") body.append("finalTaxResult", form.finalTaxResult);
         if (form.filingDate) body.append("filingDate", form.filingDate);
         if (form.notes) body.append("notes", form.notes);
         if (file) body.append("file", file);
@@ -171,7 +178,7 @@ export default function TaxesPage() {
     };
 
     return (
-        <div className="space-y-6 p-6 md:p-8">
+        <div className="space-y-6 p-4 md:p-8">
             <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
                 <div>
                     <p className="text-sm font-medium text-muted-foreground">Tax documents</p>
@@ -183,35 +190,40 @@ export default function TaxesPage() {
                 </Button>
             </div>
 
+            <div className="flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between">
+                <div><p className="text-sm font-medium">Entiende tu renta</p><p className="mt-1 text-sm text-muted-foreground">Tramos, mínimo personal y cálculo para Zaragoza · Ejercicio 2025.</p></div>
+                <TaxInfoDialog />
+            </div>
+
             {error && <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">{error}</div>}
 
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 <Card>
-                    <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Total income</CardTitle></CardHeader>
-                    <CardContent><p className="text-2xl font-bold">{formatCurrency(totalIncome)}</p><p className="text-xs text-muted-foreground">Across all tax years</p></CardContent>
+                    <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Total taxable income</CardTitle></CardHeader>
+                    <CardContent><p className="text-2xl font-bold">{formatCurrency(totalIncome)}</p><p className="text-xs text-muted-foreground">Declared/fiscal income across all tax years</p></CardContent>
                 </Card>
                 <Card>
                     <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Total income tax withheld</CardTitle></CardHeader>
                     <CardContent><p className="text-2xl font-bold text-rose-500">{formatCurrency(totalTaxPaid)}</p><p className="text-xs text-muted-foreground">Across all tax years</p></CardContent>
                 </Card>
                 <Card>
-                    <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Total net income</CardTitle></CardHeader>
-                    <CardContent><p className="text-2xl font-bold">{formatCurrency(totalNetIncome)}</p><p className="text-xs text-muted-foreground">After income tax withheld</p></CardContent>
+                    <CardHeader className="pb-2"><CardTitle className="text-sm font-medium">Income after IRPF</CardTitle></CardHeader>
+                    <CardContent><p className="text-2xl font-bold">{formatCurrency(totalNetIncome)}</p><p className="text-xs text-muted-foreground">After withholding and filed adjustments; before Social Security and other expenses</p></CardContent>
                 </Card>
             </div>
 
             <Card>
-                <CardHeader><CardTitle>Annual tax overview</CardTitle></CardHeader>
+                <CardHeader><CardTitle>Annual tax overview</CardTitle><p className="text-sm text-muted-foreground">Estimación para Aragón 2025, declaración individual, sin hijos y menor de 65 años. La deducción laboral se incluye al confirmar sus requisitos en el desglose. No incluye otras deducciones personales o autonómicas; las reglas de otros ejercicios no están verificadas.</p><p className="text-xs text-muted-foreground">Verify interest, dividends, exemptions, family circumstances and prior-year losses: these are not fully recorded by the calculator.</p></CardHeader>
                 <CardContent>
                     {annualSummaries.length === 0 ? (
                         <p className="py-8 text-center text-sm text-muted-foreground">Add a tax return to see annual income and income tax withheld.</p>
                     ) : (
                         <div className="space-y-3">
-                            <div className="hidden grid-cols-5 gap-4 border-b pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground md:grid"><span>Tax year</span><span>Income</span><span>Income tax withheld</span><span>Final tax result</span><span>Estimated result</span></div>
+                            <div className="hidden grid-cols-5 gap-4 border-b pb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground md:grid"><span>Tax year</span><span>Taxable income</span><span>Income tax withheld</span><span>Final tax result</span><span>Estimate · Aragón</span></div>
                             {annualSummaries.map((year) => (
                                 <div key={year.taxYear} className="grid gap-2 rounded-lg border p-3 md:grid-cols-5 md:items-center md:border-0 md:p-0">
                                     <span className="font-semibold">{year.taxYear}</span>
-                                    <span><span className="mr-2 text-xs text-muted-foreground md:hidden">Income</span>{formatCurrency(year.totalIncome)}</span>
+                                    <span><span className="mr-2 text-xs text-muted-foreground md:hidden">Taxable income</span>{formatCurrency(year.totalIncome)}</span>
                                     <span className="text-rose-500"><span className="mr-2 text-xs text-muted-foreground md:hidden">Income tax withheld</span>{formatCurrency(year.taxPaid)}</span>
                                     <span className={`text-sm ${year.finalTaxResult === null ? "text-muted-foreground" : year.finalTaxResult < 0 ? "text-emerald-500" : "text-rose-500"}`}><span className="mr-2 text-xs text-muted-foreground md:hidden">Final tax result</span>{formatFinalTaxResult(year.finalTaxResult)}</span>
                                     <EstimatedResult year={year} />
@@ -220,6 +232,13 @@ export default function TaxesPage() {
                         </div>
                     )}
                 </CardContent>
+            </Card>
+
+            <Card><CardHeader><CardTitle>Dividendos e intereses registrados</CardTitle><CardDescription>Desglose operativo por ejercicio. Las declaraciones presentadas conservan sus importes.</CardDescription></CardHeader>
+                <CardContent><div className="overflow-x-auto"><table className="min-w-[520px] w-full text-left text-sm"><thead><tr className="border-b"><th className="py-3">Año</th><th>Dividendos · EUR</th><th>Intereses · EUR</th><th>Conversión</th></tr></thead><tbody>
+                {annualSummaries.filter(year => (year.cashIncome?.records ?? 0) > 0).map(year => <tr key={year.taxYear} className="border-b"><td className="py-3">{year.taxYear}</td><td>{formatCurrency(year.cashIncome!.dividends)}</td><td>{formatCurrency(year.cashIncome!.interest)}</td><td className="text-xs text-muted-foreground">{year.cashIncome!.estimatedConversions > 0 ? `${year.cashIncome!.estimatedConversions} conversiones de referencia` : 'Importes en EUR / cambio registrado'}{Object.entries(year.cashIncome!.pendingByCurrency).map(([currency,amount])=><p key={currency}>Pendiente: {amount.toFixed(2)} {currency}</p>)}</td></tr>)}
+                {!annualSummaries.some(year => (year.cashIncome?.records ?? 0) > 0) && <tr><td colSpan={4} className="py-4 text-muted-foreground">{loading ? 'Cargando…' : 'No hay dividendos ni intereses registrados.'}</td></tr>}
+                </tbody></table></div><p className="mt-3 text-xs text-muted-foreground">Comprueba el bruto y las retenciones del justificante. Los cambios históricos de referencia son estimaciones; los importes sin cambio permanecen pendientes.</p></CardContent>
             </Card>
 
             <Card>
@@ -274,6 +293,7 @@ export default function TaxesPage() {
                             <div className="space-y-2"><Label htmlFor="tax-status">Status</Label><select id="tax-status" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value as TaxReturnForm["status"] })}><option value="Draft">Draft</option><option value="Filed">Filed</option><option value="Amended">Amended</option></select></div>
                             <div className="space-y-2"><Label htmlFor="filing-date">Filing date</Label><Input id="filing-date" type="date" value={form.filingDate} onChange={(event) => setForm({ ...form, filingDate: event.target.value })} /></div>
                         </div>
+                        <div className="space-y-2"><Label htmlFor="final-tax-result">Final filed result</Label><Input id="final-tax-result" type="number" step="0.01" value={form.finalTaxResult} onChange={(event) => setForm({ ...form, finalTaxResult: event.target.value })} placeholder="Not yet filed" /><p className="text-xs text-muted-foreground">Positive: amount due. Negative: refund. Leave empty if unknown.</p></div>
                         <div className="space-y-2"><Label htmlFor="tax-notes">Notes</Label><textarea id="tax-notes" className="flex min-h-24 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} placeholder="Optional notes about this filing" /></div>
                         <div className="space-y-2"><Label htmlFor="tax-file">Supporting document</Label><Input id="tax-file" type="file" accept=".pdf,.png,.jpg,.jpeg" onChange={(event) => setFile(event.target.files?.[0] ?? null)} /><p className="text-xs text-muted-foreground">PDF, PNG or JPEG up to 10 MB.</p></div>
                         <div className="flex justify-end gap-2 pt-2"><Button type="button" variant="outline" onClick={() => setIsFormOpen(false)}>Cancel</Button><Button type="submit" disabled={saving}>{saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save tax return</Button></div>
@@ -292,23 +312,42 @@ export default function TaxesPage() {
 }
 
 function EstimatedResult({ year }: { year: AnnualSummary }) {
-    const hasOperationalCategories = Object.prototype.hasOwnProperty.call(year, "employmentIncome");
+    const [employmentCreditConfirmed, setEmploymentCreditConfirmed] = useState(false);
+    if (year.source === "tax_return") return <span className="text-sm text-muted-foreground">Use filed result</span>;
+    if (!SUPPORTED_TAX_YEARS.some(value => value === year.taxYear)) return <span className="text-sm text-muted-foreground">Rules not verified for {year.taxYear}</span>;
+    if (year.issues?.length) return <details className="text-sm"><summary className="cursor-pointer text-amber-700 dark:text-amber-300">Review source data</summary><ul className="mt-2 space-y-1 text-xs text-muted-foreground">{year.issues.map(issue => <li key={issue}>{issue}</li>)}</ul></details>;
+    if ([year.operationalTaxPaid, year.employmentIncome, year.selfEmploymentIncome, year.savingsIncome, year.capitalGains, year.socialSecurity, year.workExpenses].some(value => !Number.isFinite(value)) || [year.operationalTaxPaid, year.employmentIncome, year.socialSecurity, year.workExpenses].some(value => value < 0)) return <span className="text-sm text-muted-foreground">Incomplete source data</span>;
     const estimate = estimateAragonIrpf({
-        employmentGross: Number(hasOperationalCategories ? year.employmentIncome : year.totalIncome) || 0,
-        selfEmploymentProfit: Number(hasOperationalCategories ? year.selfEmploymentIncome : 0),
-        savingsIncome: Number(hasOperationalCategories ? year.savingsIncome : 0),
-        capitalGains: Number(hasOperationalCategories ? year.capitalGains : 0),
-        socialSecurity: Number(hasOperationalCategories ? year.socialSecurity : 0),
-        workExpenses: Number(hasOperationalCategories ? year.workExpenses : 0),
+        taxYear: year.taxYear,
+        employmentGross: Number(year.employmentIncome),
+        selfEmploymentProfit: Number(year.selfEmploymentIncome),
+        savingsIncome: Number(year.savingsIncome),
+        capitalGains: Number(year.capitalGains),
+        socialSecurity: Number(year.socialSecurity),
+        workExpenses: Number(year.workExpenses),
         personalDeductions: 0,
-        withholdings: Number(year.taxPaid ?? 0),
+        withholdings: Number(year.operationalTaxPaid),
         advancePayments: 0,
+        employmentCreditConfirmed,
     });
-    const isDue = estimate.result > 0;
-    const label = estimate.result === 0
-        ? "—"
-        : isDue
-            ? `To pay ${formatCurrency(estimate.result)}`
-            : `Refund ${formatCurrency(Math.abs(estimate.result))}`;
-    return <span className={estimate.result === 0 ? "text-muted-foreground" : isDue ? "text-rose-500" : "text-emerald-500"}><span className="mr-2 text-xs text-muted-foreground md:hidden">Estimated result</span>{label}</span>;
+    const label = estimate.result === 0 ? "Balanced"
+        : estimate.result > 0 ? `To pay ${formatCurrency(estimate.result)}`
+        : `Refund ${formatCurrency(Math.abs(estimate.result))}`;
+    return <details className="text-sm">
+        <summary className="cursor-pointer font-medium text-foreground">≈ {label}</summary>
+        <dl className="mt-2 space-y-1 text-xs text-muted-foreground">
+            <div><dt>General base</dt><dd>{formatCurrency(estimate.generalBase)}</dd></div>
+            <div><dt>Savings base</dt><dd>{formatCurrency(estimate.savingsBase)}</dd></div>
+            <div><dt>Cuota general estatal</dt><dd>{formatCurrency(estimate.stateGeneralTax)}</dd></div>
+            <div><dt>Cuota general de Aragón</dt><dd>{formatCurrency(estimate.regionalGeneralTax)}</dd></div>
+            <div><dt>Cuota del ahorro</dt><dd>{formatCurrency(estimate.savingsTax)}</dd></div>
+            <div><dt>Reducción por trabajo</dt><dd>{formatCurrency(estimate.employmentReduction)}</dd></div>
+            <div><dt>Cuota antes de deducciones</dt><dd>{formatCurrency(estimate.taxBeforeCredits)}</dd></div>
+            <div><dt>Deducción laboral aplicada</dt><dd>{formatCurrency(estimate.employmentCredit)}</dd></div>
+            <div><dt>Cuota estimada tras deducción laboral</dt><dd>{formatCurrency(estimate.estimatedTax)}</dd></div>
+            <div><dt>Recorded withholding</dt><dd>{formatCurrency(estimate.amountPaid)}</dd></div>
+            {estimate.unappliedSavingsLoss > 0 && <div><dt>Losses not offset this year</dt><dd>{formatCurrency(estimate.unappliedSavingsLoss)}</dd></div>}
+        </dl>
+        {year.employmentIncome > 0 && year.employmentIncome < 18_276 && <label className="mt-3 flex items-start gap-2 text-xs text-muted-foreground"><input type="checkbox" className="mt-0.5" checked={employmentCreditConfirmed} onChange={event => setEmploymentCreditConfirmed(event.target.checked)} /><span>Incluir deducción laboral: confirmo que todo el ingreso de trabajo es por servicios laborales efectivos (sin pensión ni desempleo) y que están registradas todas mis rentas del año. Solo para esta simulación.</span></label>}
+    </details>;
 }

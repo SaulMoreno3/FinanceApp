@@ -16,6 +16,8 @@
     "add:conversion": "tsx src/scripts/add-conversion-rates.ts",
     "sync:market-history": "tsx src/scripts/sync-market-history.ts",
     "db:seed": "tsx src/scripts/seed.ts",
+    "revolut:keygen": "tsx src/scripts/generate-revolut-keys.ts",
+    "revolut:test": "tsx src/scripts/test-revolut.ts",
     "prisma:generate": "prisma generate",
     "prisma:validate": "prisma validate",
     "prisma:format": "prisma format",

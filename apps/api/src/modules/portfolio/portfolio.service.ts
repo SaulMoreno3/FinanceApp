@@ -57,7 +57,8 @@ export class PortfolioService {
                     const sellValue = (trade.price * quantityFromThisLot) - sellCostsForChunk;
                     const buyCost = buyLot.costPerShare * quantityFromThisLot;
 
-                    const gain = trade.type === 'InternalTransfer' ? 0 : sellValue - buyCost;
+                    const isInternalTransfer = trade.type?.trim().toLowerCase() === 'internaltransfer';
+                    const gain = isInternalTransfer ? 0 : sellValue - buyCost;
                     realizedGain += gain;
 
                     breakdown.push({
@@ -90,6 +91,7 @@ export class PortfolioService {
 
         return {
             symbol: trades[0]?.symbol || '',
+            assetType: trades[0]?.assetType || 'Stock',
             isin: trades[0]?.isin,
             name: trades[0]?.name,
             currency: trades[0]?.currency || 'EUR',
@@ -137,7 +139,8 @@ export class PortfolioService {
 
                 // Net Proceeds = (Price * Quantity) - Fees - Commission
                 const netProceeds = (trade.quantity * trade.price) - (trade.fees || 0) - (trade.commission || 0);
-                const gain = trade.type === 'InternalTransfer' ? 0 : netProceeds - costOfSoldShares;
+                const isInternalTransfer = trade.type?.trim().toLowerCase() === 'internaltransfer';
+                const gain = isInternalTransfer ? 0 : netProceeds - costOfSoldShares;
 
                 realizedGain += gain;
 
@@ -166,6 +169,7 @@ export class PortfolioService {
 
         return {
             symbol: trades[0]?.symbol || '',
+            assetType: trades[0]?.assetType || 'Stock',
             isin: trades[0]?.isin,
             name: trades[0]?.name,
             currency: trades[0]?.currency || 'EUR',
@@ -204,11 +208,20 @@ export class PortfolioService {
             // 2. EUR Trade (Converted)
             let eurTrade = { ...trade };
             if (trade.currency === 'EUR') {
-            } else if (exchangeRates.length > 0) {
+            } else {
                 const tradeDate = new Date(trade.date).getTime();
-                const applicableRate = exchangeRates
-                    .filter(rate => rate.currency === trade.currency && rate.date.getTime() <= tradeDate)
-                    .at(-1)?.rate;
+                // Prefer the FX rate recorded on the trade itself. Falling
+                // back to a cash-transfer rate can use the wrong rate for a
+                // sale, especially when the broker settles it later.
+                const storedRate = trade.conversionRate
+                    ?? (trade.eurValue != null && trade.value && trade.value > 0
+                        ? trade.eurValue / trade.value
+                        : undefined);
+                const applicableRate = storedRate ?? (exchangeRates.length > 0
+                    ? exchangeRates
+                        .filter(rate => rate.currency === trade.currency && rate.date.getTime() <= tradeDate)
+                        .at(-1)?.rate
+                    : undefined);
 
                 if (applicableRate) {
                     eurTrade.price = trade.price * applicableRate;
@@ -218,8 +231,6 @@ export class PortfolioService {
                 } else {
                     tradesByPosition[positionKey].conversionComplete = false;
                 }
-            } else {
-                tradesByPosition[positionKey].conversionComplete = false;
             }
 
             if (trade.currency === 'EUR' || eurTrade.currency === 'EUR') {

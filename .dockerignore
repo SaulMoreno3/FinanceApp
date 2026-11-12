@@ -1,4 +1,11 @@
 .git
+tmp
+output
+backups
+docs
+.playwright-cli
+**/*.pem
+**/*.key
 .github
 **/.env
 **/.env.*

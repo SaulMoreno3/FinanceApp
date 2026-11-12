@@ -52,6 +52,8 @@ export default function AccountSettingsPage() {
         timezone: user?.timezone ?? "Europe/Madrid",
         preferredCurrency: user?.preferredCurrency ?? "EUR" as "EUR" | "USD",
     });
+    const [emailPassword, setEmailPassword] = useState("");
+    const emailChanged = profile.email.trim().toLowerCase() !== user?.email;
     const [passwords, setPasswords] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
     const [showPasswords, setShowPasswords] = useState(false);
     const [profileNotice, setProfileNotice] = useState<Notice>(null);
@@ -64,7 +66,8 @@ export default function AccountSettingsPage() {
         setSavingProfile(true);
         setProfileNotice(null);
         try {
-            await fetchAPI("/auth/profile", { method: "PATCH", body: JSON.stringify(profile) });
+            await fetchAPI("/auth/profile", { method: "PATCH", body: JSON.stringify({ ...profile, ...(emailChanged ? { currentPassword: emailPassword } : {}) }) });
+            setEmailPassword("");
             await refetchUser();
             setProfileNotice({ type: "success", text: "Your profile and preferences have been saved." });
         } catch (error) {
@@ -98,14 +101,11 @@ export default function AccountSettingsPage() {
     };
 
     const passwordChecks = [
-        { label: "10 characters", valid: passwords.newPassword.length >= 10 },
-        { label: "One uppercase letter", valid: /[A-Z]/.test(passwords.newPassword) },
-        { label: "One lowercase letter", valid: /[a-z]/.test(passwords.newPassword) },
-        { label: "One number", valid: /\d/.test(passwords.newPassword) },
+        { label: "12–128 characters", valid: passwords.newPassword.length >= 12 && passwords.newPassword.length <= 128 },
     ];
 
     return (
-        <div className="mx-auto w-full max-w-5xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
+        <div className="w-full space-y-8 p-4 md:p-8">
             <div className="space-y-2">
                 <p className="text-sm font-medium text-muted-foreground">Account</p>
                 <h2 className="text-3xl font-bold tracking-tight">Settings</h2>
@@ -172,6 +172,10 @@ export default function AccountSettingsPage() {
                             <div className="space-y-2">
                                 <Label htmlFor="email">Email address</Label>
                                 <Input id="email" type="email" value={profile.email} onChange={(event) => setProfile((current) => ({ ...current, email: event.target.value }))} required autoComplete="email" />
+                                {emailChanged && <div className="space-y-2 pt-2">
+                                    <Label htmlFor="email-password">Contraseña actual para cambiar el correo</Label>
+                                    <Input id="email-password" type="password" value={emailPassword} onChange={event => setEmailPassword(event.target.value)} maxLength={128} autoComplete="current-password" required />
+                                </div>}
                             </div>
                         </div>
                     </CardContent>
@@ -250,7 +254,7 @@ export default function AccountSettingsPage() {
                                             value={field.value}
                                             onChange={(event) => setPasswords((current) => ({ ...current, [field.id]: event.target.value }))}
                                             autoComplete={field.autoComplete}
-                                            minLength={index === 0 ? 1 : 10}
+                                            minLength={index === 0 ? 1 : 12}
                                             required
                                             className={index === 2 ? "pr-10" : undefined}
                                         />

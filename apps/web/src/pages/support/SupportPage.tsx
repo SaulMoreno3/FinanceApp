@@ -19,7 +19,7 @@ const helpTopics = [
 
 export default function SupportPage() {
     return (
-        <div className="mx-auto w-full max-w-5xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
+        <div className="w-full space-y-8 p-4 md:p-8">
             <div className="space-y-2">
                 <p className="text-sm font-medium text-muted-foreground">Support</p>
                 <h2 className="text-3xl font-bold tracking-tight">How can we help?</h2>

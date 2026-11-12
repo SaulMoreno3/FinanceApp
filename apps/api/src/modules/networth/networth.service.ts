@@ -1,4 +1,6 @@
 import pool from '../../common/db/client';
+import { consolidatedValues } from './consolidated';
+import { expensesService } from '../expenses/expenses.service';
 import type {
     CreateAssetBody,
     UpdateAssetBody,
@@ -7,6 +9,7 @@ import type {
     CreateValuationBody,
     GetValuationsQuery
 } from './networth.schema';
+import { FLEXIBLE_FUNDS_OPENING_BALANCE } from '../bank-sync/bank-transfer';
 
 export class NetWorthService {
 
@@ -333,6 +336,7 @@ export class NetWorthService {
     `;
 
         const countSoldQuery = `SELECT COUNT(*) as "countSold" FROM networth_assets WHERE "isSold" = TRUE AND "userId" = $1`;
+        const liabilitiesQuery = `SELECT COALESCE(SUM("currentBalance") FILTER (WHERE currency = 'EUR' AND status = 'ACTIVE'), 0) AS "totalLiabilities" FROM debts WHERE "userId" = $1`;
 
         const breakdownQuery = `
       WITH LatestValuations AS (
@@ -364,30 +368,53 @@ export class NetWorthService {
           GROUP BY v.currency
         `;
 
-        const [summaryRes, soldRes, breakdownRes, totalsByCurrencyRes] = await Promise.all([
+        const [summaryRes, soldRes, breakdownRes, totalsByCurrencyRes, liabilitiesRes, banksRes, portfolioRes, flexibleFundsRes] = await Promise.all([
             pool.query(summaryQuery, [userId]),
             pool.query(countSoldQuery, [userId]),
             pool.query(breakdownQuery, [userId]),
-            pool.query(totalsByCurrencyQuery, [userId])
+            pool.query(totalsByCurrencyQuery, [userId]),
+            pool.query(liabilitiesQuery, [userId]),
+            pool.query('SELECT currency, balance, "balanceUpdatedAt" FROM bank_accounts WHERE "userId" = $1', [userId]),
+            pool.query(`SELECT "marketValue", date, "hasEstimates" FROM portfolio_daily_snapshots
+                WHERE "userId" = $1 AND currency = 'EUR' AND "marketValueAvailable" = TRUE AND date <= CURRENT_DATE
+                ORDER BY date DESC LIMIT 1`, [userId]),
+            pool.query(`SELECT COUNT(*)::int AS count, COALESCE(SUM(amount), 0) AS total
+                        FROM bank_transactions WHERE "userId" = $1
+                        AND description ILIKE '%Fondos Monetarios Flexibles%'`, [userId]),
         ]);
 
         const summary = summaryRes.rows[0];
         const sold = soldRes.rows[0];
 
+
+        const credit = await expensesService.creditExposure(userId);
+        const totalLiabilities = parseFloat(liabilitiesRes.rows[0]?.totalLiabilities ?? '0') + credit.amount;
+        const flexibleFunds = Number(flexibleFundsRes.rows[0]?.count ?? 0)>0
+            ? FLEXIBLE_FUNDS_OPENING_BALANCE-Number(flexibleFundsRes.rows[0]?.total ?? 0) : 0;
+
+        const consolidated = consolidatedValues(
+            Object.fromEntries(totalsByCurrencyRes.rows.map(row => [row.currency, Number(row.value)])),
+            banksRes.rows, portfolioRes.rows[0], totalLiabilities, flexibleFunds,
+        );
         return {
-            totalCurrentNetWorth: parseFloat(summary.totalCurrentNetWorth),
+            ...consolidated,
+            totalLiabilities,
+            creditCardLiabilities: credit.amount,
+            unknownCreditCardBalances: credit.unknown,
             countActive: parseInt(summary.countActive, 10),
             countSold: parseInt(sold.countSold, 10),
             currency: 'EUR',
-            totalsByCurrency: Object.fromEntries(
-                totalsByCurrencyRes.rows.map(row => [row.currency, parseFloat(row.value)])
-            ),
-            breakdownByCategory: breakdownRes.rows.map(row => ({
+            breakdownByCategory: [...breakdownRes.rows.map(row => ({
                 category: row.category || 'Uncategorized',
                 currency: row.currency || 'EUR',
                 totalValue: parseFloat(row.totalValue),
                 count: parseInt(row.count, 10)
-            }))
+            })), ...Object.entries(banksRes.rows.reduce((totals: Record<string, number>, row) => {
+                if (row.balance !== null) totals[row.currency] = (totals[row.currency] ?? 0) + Number(row.balance);
+                return totals;
+            }, {})).map(([currency, totalValue]) => ({ category: 'Bank accounts', currency, totalValue, count: banksRes.rows.filter(row => row.currency === currency && row.balance !== null).length })),
+            ...(flexibleFunds ? [{ category: 'Flexible monetary funds', currency: 'EUR', totalValue: flexibleFunds, count: 1 }] : []),
+            ...(portfolioRes.rows.length ? [{ category: 'Investment portfolio', currency: 'EUR', totalValue: consolidated.sources.portfolio, count: 1 }] : [])]
         };
     }
 }

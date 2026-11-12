@@ -53,6 +53,8 @@ function displayTransactionType(type: string, side: string) {
     return type;
 }
 
+import { AddTradeModal } from '@/components/transactions/AddTradeModal';
+
 export default function TransactionsPage() {
     const [searchParams, setSearchParams] = useSearchParams();
     const [data, setData] = useState<Transaction[]>([]);
@@ -61,6 +63,7 @@ export default function TransactionsPage() {
     const [error, setError] = useState<string | null>(null);
     const [sortConfig, setSortConfig] = useState<SortConfig>(null);
     const [activeTab, setActiveTab] = useState<"list" | "pending">("list");
+    const [revision,setRevision]=useState(0);
 
     const page = parseInt(searchParams.get("page") || "1", 10);
     const limit = parseInt(searchParams.get("limit") || "50", 10);
@@ -86,7 +89,7 @@ export default function TransactionsPage() {
 
             loadTransactions();
         }
-    }, [page, limit, activeTab]);
+    }, [page, limit, activeTab,revision]);
 
     const handlePageChange = (newPage: number) => {
         setSearchParams({ page: newPage.toString(), limit: limit.toString() });
@@ -136,7 +139,7 @@ export default function TransactionsPage() {
     return (
         <div className="h-full flex flex-col overflow-hidden p-4 md:p-8 space-y-4">
             <div className="flex items-center justify-between">
-                <h1 className="text-3xl font-bold tracking-tight">Transactions</h1>
+                <div className="flex items-center gap-4"><h1 className="text-3xl font-bold tracking-tight">Transactions</h1><AddTradeModal onSuccess={()=>setRevision(value=>value+1)}/></div>
                 <div className="flex space-x-2 bg-muted p-1 rounded-lg">
                     <button
                         onClick={() => setActiveTab("list")}

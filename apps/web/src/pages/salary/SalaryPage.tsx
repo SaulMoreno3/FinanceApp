@@ -33,7 +33,7 @@ export default function SalaryPage() {
     };
 
     return (
-        <div className="space-y-8 py-8 container mx-auto max-w-7xl">
+        <div className="space-y-8 p-4 md:p-8">
             <div className="flex items-center justify-between">
                 <div>
                     <h1 className="text-3xl font-bold tracking-tight">Salaries</h1>

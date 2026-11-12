@@ -4,16 +4,27 @@ import { transactionsService } from '../transactions/transactions.service';
 import { StockTrade } from './portfolio.types';
 import { portfolioHistoryService, type PortfolioHistoryRange } from './portfolio-history.service';
 import { marketDataService } from '../market-data/market-data.service';
+import { prisma } from '../../common/db/prisma';
+import { Currency } from '../../generated/prisma/enums';
+import { priceService } from '../prices/price.service';
+import { calculatePortfolioValuation } from './portfolio-valuation';
+import { ZodError } from 'zod';
 
 const HISTORY_RANGES = new Set<PortfolioHistoryRange>(['1D', '1W', '1M', 'YTD', '1Y', 'MAX']);
 
 export class PortfolioController {
+    async createTrade(req:any,res:Response) {
+        try{return res.status(201).json(await transactionsService.createTrade(req.user!.id,req.body));}
+        catch(error){if(error instanceof ZodError)return res.status(400).json({error:error.issues[0]?.message??'Invalid trade'});
+            console.error('Error creating manual trade');return res.status(500).json({error:'Unable to create trade'});}
+    }
     async getPortfolioHistory(req: any, res: Response) {
         try {
             const range = String(req.query.range ?? 'YTD').toUpperCase() as PortfolioHistoryRange;
             if (!HISTORY_RANGES.has(range)) {
                 return res.status(400).json({ error: 'Unsupported history range' });
             }
+
             const history = await portfolioHistoryService.getHistory(req.user!.id, range);
             if (!history) {
                 return res.status(404).json({ error: 'Portfolio history has not been generated yet' });
@@ -63,11 +74,15 @@ export class PortfolioController {
                 symbol: t.symbol,
                 isin: t.isin,
                 name: t.name,
+                assetType: t.assetType,
                 currency: t.currency,
                 quantity: t.quantity,
                 price: t.price,
+                value: t.value,
                 side: t.side,
                 type: t.type,
+                eurValue: t.eurValue == null ? null : Number(t.eurValue),
+                conversionRate: t.conversionRate == null ? null : Number(t.conversionRate),
                 costBasisOverride: t.costBasisOverride,
                 fees: t.fees,
                 commission: t.commission
@@ -105,19 +120,30 @@ export class PortfolioController {
                 page: 1
             });
 
-            // Fetch exchange rates
-            const exchangeRates = await transactionsService.getExchangeRates(userId);
+            // Use the same ECB reference-rate series as portfolio history.
+            // Cash-transfer rates describe a different operation and caused
+            // realized P&L to disagree with the historical snapshots whenever
+            // a trade did not include an explicit broker conversion.
+            const exchangeRates = (await prisma.marketFxRate.findMany({
+                where: { baseCurrency: Currency.USD, quoteCurrency: Currency.EUR },
+                orderBy: { date: 'asc' },
+                select: { date: true, rate: true },
+            })).map((rate) => ({ date: rate.date, rate: Number(rate.rate), currency: 'USD' }));
 
             const trades: StockTrade[] = tradesResult.data.map((t: any) => ({
                 date: new Date(t.date),
                 symbol: t.symbol,
                 isin: t.isin,
                 name: t.name,
+                assetType: t.assetType,
                 currency: t.currency,
                 quantity: t.quantity,
                 price: t.price,
+                value: t.value,
                 side: t.side,
                 type: t.type,
+                eurValue: t.eurValue == null ? null : Number(t.eurValue),
+                conversionRate: t.conversionRate == null ? null : Number(t.conversionRate),
                 costBasisOverride: t.costBasisOverride,
                 fees: t.fees,
                 commission: t.commission
@@ -139,8 +165,11 @@ export class PortfolioController {
             const totalCostBasis = conversionComplete
                 ? results.reduce((sum, item) => sum + (item.totalCostBasisEur ?? 0), 0)
                 : null;
-
-
+            const openSymbols = results
+                .filter((item) => item.remainingShares > 0)
+                .map((item) => item.symbol);
+            const quotes = await priceService.getPrices([...new Set([...openSymbols, 'USDEUR=X'])]);
+            const valuation = calculatePortfolioValuation(results, quotes);
 
             return reqRes.json({
                 currency,
@@ -148,6 +177,7 @@ export class PortfolioController {
                 totalRealizedGain,
                 totalCostBasis,
                 conversionComplete,
+                valuation,
                 holdings: results
                     .filter(r => r.remainingShares > 0 || r.realizedGain !== 0)
                     .map(({ breakdown, ...rest }) => rest) // Exclude breakdown from summary to reduce payload size

@@ -6,7 +6,7 @@ const frontendUrl = () => (process.env.WEB_APP_URL ?? 'https://finance.saulmoren
 export class BankSyncController {
     async connect(req: any, res: Response) {
         try {
-            res.json({ url: await trueLayerService.createConnectionUrl(req.user!.id) });
+            res.json({ url: await trueLayerService.createConnectionUrl(req.user!.id, req.query.cards === 'true') });
         } catch (error: any) {
             res.status(error.statusCode ?? 500).json({ error: error.message ?? 'No se pudo iniciar la conexión bancaria' });
         }
@@ -30,7 +30,16 @@ export class BankSyncController {
     }
 
     async overview(req: any, res: Response) {
-        res.json(await trueLayerService.getOverview(req.user!.id));
+        const month = req.query.month;
+        if (month !== undefined && (typeof month !== 'string' || !/^\d{4}-(0[1-9]|1[0-2])$/.test(month))) {
+            res.status(400).json({ error: 'El mes debe tener el formato AAAA-MM' });
+            return;
+        }
+        res.json(await trueLayerService.getOverview(req.user!.id, month));
+    }
+
+    async balanceHistory(req: any, res: Response) {
+        res.json(await trueLayerService.getBalanceHistory(req.user!.id));
     }
 
     async transactions(req: any, res: Response) {

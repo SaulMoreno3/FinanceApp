@@ -50,31 +50,43 @@ enum DebtStatus {
 }
 
 model User {
-  id                 String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  email              String                   @unique @db.VarChar(255)
-  passwordHash       String                   @map("password_hash") @db.VarChar(255)
-  name               String?                  @db.VarChar(100)
-  avatarIcon         String                   @default("user-round") @db.VarChar(32)
-  avatarColor        String                   @default("slate") @db.VarChar(24)
-  locale             String                   @default("es-ES") @db.VarChar(10)
-  timezone           String                   @default("Europe/Madrid") @db.VarChar(64)
-  preferredCurrency  Currency                 @default(EUR)
-  sessionVersion     Int                      @default(0)
-  createdAt          DateTime                 @default(now()) @db.Timestamptz(6)
-  updatedAt          DateTime                 @default(now()) @updatedAt @db.Timestamptz(6)
-  stockTrades        StockTrade[]
-  cashTransfers      CashTransfer[]
-  netWorthAssets     NetWorthAsset[]
-  salaryRecords      SalaryRecord[]
-  importHistory      ImportHistory[]
-  salaryPdfPasswords SalaryPdfPassword[]
-  taxReturns         TaxReturn[]
-  projects           Project[]
-  portfolioSnapshots PortfolioDailySnapshot[]
-  debts              Debt[]
-  bankConnections    BankConnection[]
-  bankAccounts       BankAccount[]
-  bankTransactions   BankTransaction[]
+  id                   String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  email                String                   @unique @db.VarChar(255)
+  passwordHash         String                   @map("password_hash") @db.VarChar(255)
+  name                 String?                  @db.VarChar(100)
+  avatarIcon           String                   @default("user-round") @db.VarChar(32)
+  avatarColor          String                   @default("slate") @db.VarChar(24)
+  locale               String                   @default("es-ES") @db.VarChar(10)
+  timezone             String                   @default("Europe/Madrid") @db.VarChar(64)
+  preferredCurrency    Currency                 @default(EUR)
+  sessionVersion       Int                      @default(0)
+  createdAt            DateTime                 @default(now()) @db.Timestamptz(6)
+  updatedAt            DateTime                 @default(now()) @updatedAt @db.Timestamptz(6)
+  stockTrades          StockTrade[]
+  cashTransfers        CashTransfer[]
+  netWorthAssets       NetWorthAsset[]
+  salaryRecords        SalaryRecord[]
+  importHistory        ImportHistory[]
+  salaryPdfPasswords   SalaryPdfPassword[]
+  taxReturns           TaxReturn[]
+  projects             Project[]
+  portfolioSnapshots   PortfolioDailySnapshot[]
+  realEstateProperties RealEstateProperty[]
+  debts                Debt[]
+  bankConnections      BankConnection[]
+  bankAccounts         BankAccount[]
+  bankTransactions     BankTransaction[]
+  financePlan          FinancePlan?
+  financeClosings      FinanceMonthClosing[]
+  expenseCards         ExpenseCard[]
+  expenseEntries       ExpenseEntry[]
+  expenseTokens        ExpenseToken[]
+  expenseRules         ExpenseRule[]
+  expenseBudgets       ExpenseBudget[]
+  expenseStatements    ExpenseStatement[]
+  expenseSyncStatus    ExpenseSyncStatus?
+  expenseWalletCards   ExpenseWalletCard[]
+  expenseWalletCaptures ExpenseWalletCapture[]
 
   @@map("users")
 }
@@ -146,6 +158,7 @@ model Debt {
   updatedAt         DateTime       @default(now()) @updatedAt @db.Timestamptz(6)
   user              User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   schedule          DebtSchedule[]
+  payments          DebtPayment[]
 
   @@index([userId])
   @@index([userId, status])
@@ -166,6 +179,24 @@ model DebtSchedule {
   @@unique([debtId, installment])
   @@index([debtId, dueDate])
   @@map("debt_schedule")
+}
+
+model DebtPayment {
+  id                String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  debtId            String          @db.Uuid
+  bankTransactionId String          @unique @db.Uuid
+  installment       Int
+  paidAt            DateTime        @db.Timestamptz(6)
+  amount            Decimal         @db.Decimal(14, 2)
+  principalAmount   Decimal         @db.Decimal(14, 2)
+  interestAmount    Decimal         @db.Decimal(14, 2)
+  detectedAt        DateTime        @default(now()) @db.Timestamptz(6)
+  debt              Debt            @relation(fields: [debtId], references: [id], onDelete: Cascade)
+  bankTransaction   BankTransaction @relation(fields: [bankTransactionId], references: [id], onDelete: Cascade)
+
+  @@unique([debtId, installment])
+  @@index([debtId, paidAt])
+  @@map("debt_payments")
 }
 
 model StockTrade {
@@ -290,8 +321,11 @@ model PortfolioDailySnapshot {
   unrealizedGain       Decimal                          @db.Decimal(20, 8)
   dividends            Decimal                          @default(0) @db.Decimal(20, 8)
   fees                 Decimal                          @default(0) @db.Decimal(20, 8)
+  cashInflows          Decimal                          @default(0) @db.Decimal(20, 8)
+  cashOutflows         Decimal                          @default(0) @db.Decimal(20, 8)
   netContributions     Decimal                          @default(0) @db.Decimal(20, 8)
   dailyPnl             Decimal                          @default(0) @db.Decimal(20, 8)
+  dailyReturn          Decimal                          @default(0) @db.Decimal(20, 12)
   hasEstimates         Boolean                          @default(false)
   marketValueAvailable Boolean                          @default(true)
   createdAt            DateTime                         @default(now()) @db.Timestamptz(6)
@@ -373,6 +407,7 @@ model BankConnection {
   updatedAt             DateTime             @default(now()) @updatedAt @db.Timestamptz(6)
   user                  User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
   accounts              BankAccount[]
+  expenseCards          ExpenseCard[]
 
   @@unique([userId, provider])
   @@index([userId, status])
@@ -396,6 +431,7 @@ model BankAccount {
   user              User              @relation(fields: [userId], references: [id], onDelete: Cascade)
   connection        BankConnection    @relation(fields: [connectionId], references: [id], onDelete: Cascade)
   transactions      BankTransaction[]
+  expenseCards      ExpenseCard[]
 
   @@unique([connectionId, providerAccountId])
   @@index([userId])
@@ -403,28 +439,191 @@ model BankAccount {
 }
 
 model BankTransaction {
-  id                    String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId                String      @db.Uuid
-  accountId             String      @db.Uuid
-  providerTransactionId String      @db.VarChar(255)
-  date                  DateTime    @db.Timestamptz(6)
-  amount                Decimal     @db.Decimal(20, 8)
-  currency              String      @db.VarChar(3)
+  id                    String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId                String            @db.Uuid
+  accountId             String            @db.Uuid
+  providerTransactionId String            @db.VarChar(255)
+  date                  DateTime          @db.Timestamptz(6)
+  amount                Decimal           @db.Decimal(20, 8)
+  currency              String            @db.VarChar(3)
   description           String?
   merchantName          String?
   category              String?
-  direction             String      @db.VarChar(16)
-  status                String      @default("booked") @db.VarChar(24)
+  direction             String            @db.VarChar(16)
+  status                String            @default("booked") @db.VarChar(24)
   rawData               Json?
-  createdAt             DateTime    @default(now()) @db.Timestamptz(6)
-  updatedAt             DateTime    @updatedAt @db.Timestamptz(6)
-  user                  User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  account               BankAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  createdAt             DateTime          @default(now()) @db.Timestamptz(6)
+  updatedAt             DateTime          @updatedAt @db.Timestamptz(6)
+  user                  User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  account               BankAccount       @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  debtPayments          DebtPayment[]
+  expenseEntry          ExpenseEntry?
+  expenseStatement      ExpenseStatement?
 
   @@unique([accountId, providerTransactionId])
   @@index([userId, date])
   @@index([userId, category])
   @@map("bank_transactions")
+}
+
+model ExpenseCard {
+  id             String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String             @db.Uuid
+  name           String             @db.VarChar(100)
+  kind           String             @db.VarChar(10)
+  currency       String             @db.VarChar(3)
+  bankAccountId  String?            @db.Uuid
+  providerCardId String?            @db.VarChar(255)
+  connectionId   String?            @db.Uuid
+  openingBalance Decimal?           @db.Decimal(14, 2)
+  openingDate    DateTime           @db.Date
+  dueDay         Int                @default(1)
+  balance        Decimal?           @db.Decimal(14, 2)
+  balanceAt      DateTime?          @db.Timestamptz
+  createdAt      DateTime           @default(now()) @db.Timestamptz
+  user           User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bankAccount    BankAccount?       @relation(fields: [bankAccountId], references: [id], onDelete: SetNull)
+  connection     BankConnection?    @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  entries        ExpenseEntry[]
+  tokens         ExpenseToken[]
+  statements     ExpenseStatement[]
+  walletCards    ExpenseWalletCard[]
+
+  @@unique([userId, providerCardId])
+  @@unique([id, userId])
+  @@index([userId])
+  @@map("expense_cards")
+}
+
+model ExpenseEntry {
+  id                String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId            String           @db.Uuid
+  cardId            String           @db.Uuid
+  date              DateTime         @db.Timestamptz
+  amount            Decimal          @db.Decimal(14, 2)
+  merchant          String           @db.VarChar(250)
+  category          String?          @db.VarChar(100)
+  categoryOverride  String?          @db.VarChar(100)
+  source            String           @db.VarChar(20)
+  sourceId          String           @db.VarChar(255)
+  entryType         String           @default("PURCHASE") @db.VarChar(10)
+  matchedEntryId    String?          @db.Uuid
+  bankTransactionId String?          @unique @db.Uuid
+  excluded          Boolean          @default(false)
+  provisional       Boolean          @default(false)
+  createdAt         DateTime         @default(now()) @db.Timestamptz
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  card              ExpenseCard      @relation(fields: [cardId, userId], references: [id, userId], onDelete: Cascade)
+  matchedEntry      ExpenseEntry?    @relation("ExpenseMatch", fields: [matchedEntryId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  matchedCaptures   ExpenseEntry[]   @relation("ExpenseMatch")
+  bankTransaction   BankTransaction? @relation(fields: [bankTransactionId], references: [id], onDelete: SetNull)
+  walletCapture     ExpenseWalletCapture?
+
+  @@unique([cardId, source, sourceId])
+  @@index([userId, date])
+  @@map("expense_entries")
+}
+
+model ExpenseToken {
+  id         String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String      @db.Uuid
+  cardId     String      @db.Uuid
+  name       String      @db.VarChar(100)
+  tokenHash  String      @unique @db.VarChar(64)
+  scope      String      @default("CARD") @db.VarChar(10)
+  createdAt  DateTime    @default(now()) @db.Timestamptz
+  lastUsedAt DateTime?   @db.Timestamptz
+  revokedAt  DateTime?   @db.Timestamptz
+  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  card       ExpenseCard @relation(fields: [cardId, userId], references: [id, userId], onDelete: Cascade)
+
+  @@map("expense_tokens")
+}
+
+model ExpenseWalletCard {
+  id         String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String @db.Uuid
+  name       String @db.VarChar(250)
+  walletKey  String @db.VarChar(250)
+  currency   String @db.VarChar(3)
+  cardId     String? @db.Uuid
+  lastSeenAt DateTime @default(now()) @db.Timestamptz
+  user       User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  card       ExpenseCard? @relation(fields: [cardId, userId], references: [id, userId], onDelete: NoAction, onUpdate: NoAction)
+  captures   ExpenseWalletCapture[]
+
+  @@unique([userId, walletKey, currency])
+  @@unique([id, userId])
+  @@map("expense_wallet_cards")
+}
+
+model ExpenseWalletCapture {
+  id             String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId         String @db.Uuid
+  walletCardId   String @db.Uuid
+  eventId        String @db.VarChar(255)
+  date           DateTime @db.Timestamptz
+  amount         Decimal @db.Decimal(14, 2)
+  merchant       String @db.VarChar(250)
+  entryType      String @db.VarChar(10)
+  expenseEntryId String? @unique @db.Uuid
+  categoryOverride String? @db.VarChar(100)
+  excluded       Boolean @default(false)
+  user           User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  walletCard     ExpenseWalletCard @relation(fields: [walletCardId, userId], references: [id, userId], onDelete: Cascade)
+  expenseEntry   ExpenseEntry? @relation(fields: [expenseEntryId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([walletCardId, eventId])
+  @@index([userId])
+  @@map("expense_wallet_captures")
+}
+
+model ExpenseRule {
+  userId   String @db.Uuid
+  merchant String @db.VarChar(250)
+  category String @db.VarChar(100)
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, merchant])
+  @@map("expense_rules")
+}
+
+model ExpenseBudget {
+  userId   String  @db.Uuid
+  category String  @db.VarChar(100)
+  amount   Decimal @db.Decimal(14, 2)
+  user     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, category])
+  @@map("expense_budgets")
+}
+
+model ExpenseStatement {
+  id                String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId            String           @db.Uuid
+  cardId            String           @db.Uuid
+  startDate         DateTime         @db.Date
+  endDate           DateTime         @db.Date
+  dueDate           DateTime         @db.Date
+  amount            Decimal          @db.Decimal(14, 2)
+  bankTransactionId String?          @unique @db.Uuid
+  createdAt         DateTime         @default(now()) @db.Timestamptz
+  user              User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  card              ExpenseCard      @relation(fields: [cardId, userId], references: [id, userId], onDelete: Cascade)
+  bankTransaction   BankTransaction? @relation(fields: [bankTransactionId], references: [id], onDelete: SetNull)
+
+  @@unique([cardId, startDate, endDate])
+  @@map("expense_statements")
+}
+
+model ExpenseSyncStatus {
+  userId    String   @id @db.Uuid
+  status    String   @db.VarChar(30)
+  message   String
+  checkedAt DateTime @default(now()) @db.Timestamptz
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("expense_sync_status")
 }
 
 model NetWorthAsset {
@@ -548,4 +747,41 @@ model TaxReturn {
   @@index([userId])
   @@index([userId, taxYear])
   @@map("tax_returns")
+}
+
+// One validated aggregate per property: rent history, expenses and receipt overrides
+// are saved atomically. Version protects against lost concurrent edits.
+model RealEstateProperty {
+  id        String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String   @db.Uuid
+  data      Json     @db.JsonB
+  version   Int      @default(1)
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("real_estate_properties")
+}
+
+model FinancePlan {
+  userId    String   @id @db.Uuid
+  data      Json     @db.JsonB
+  version   Int      @default(1)
+  updatedAt DateTime @default(now()) @updatedAt @db.Timestamptz(6)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("finance_plans")
+}
+
+model FinanceMonthClosing {
+  userId      String   @db.Uuid
+  month       String   @db.VarChar(7)
+  snapshot    Json     @db.JsonB
+  fingerprint String
+  reviewedAt  DateTime @default(now()) @db.Timestamptz(6)
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([userId, month])
+  @@map("finance_month_closings")
 }

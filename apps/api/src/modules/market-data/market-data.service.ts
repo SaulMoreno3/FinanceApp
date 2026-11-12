@@ -35,7 +35,25 @@ export type MarketSyncResult = {
     priceBars: number;
     fxRates: number;
     failures: Array<{ symbol: string; reason: string }>;
+    startedAt: string;
+    completedAt: string;
+    status: 'ok' | 'partial';
 };
+
+async function forEachWithConcurrency<T>(
+    items: T[],
+    concurrency: number,
+    worker: (item: T) => Promise<void>,
+): Promise<void> {
+    let cursor = 0;
+    await Promise.all(Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+        while (cursor < items.length) {
+            const item = items[cursor];
+            cursor += 1;
+            await worker(item);
+        }
+    }));
+}
 
 function asDateOnly(value: string | Date): Date {
     const date = typeof value === 'string' ? new Date(`${value}T00:00:00.000Z`) : value;
@@ -100,6 +118,7 @@ function parseCsvRow(row: string): string[] {
 
 export class MarketDataService {
     async syncUserHistory(userId: string): Promise<MarketSyncResult> {
+        const startedAt = new Date().toISOString();
         const trades = await prisma.stockTrade.findMany({
             where: { userId },
             select: {
@@ -114,7 +133,15 @@ export class MarketDataService {
         });
 
         if (trades.length === 0) {
-            return { instruments: 0, priceBars: 0, fxRates: 0, failures: [] };
+            return {
+                instruments: 0,
+                priceBars: 0,
+                fxRates: 0,
+                failures: [],
+                startedAt,
+                completedAt: new Date().toISOString(),
+                status: 'ok',
+            };
         }
 
         const startDate = asDateOnly(trades[0].date);
@@ -130,9 +157,12 @@ export class MarketDataService {
             priceBars: 0,
             fxRates: 0,
             failures: [],
+            startedAt,
+            completedAt: startedAt,
+            status: 'ok',
         };
 
-        for (const identity of identities) {
+        await forEachWithConcurrency(identities, 4, async (identity) => {
             try {
                 const provider = providerFor(identity);
                 const instrument = await prisma.instrument.upsert({
@@ -177,34 +207,67 @@ export class MarketDataService {
                     data: { instrumentId: instrument.id, listingId: listing.id },
                 });
 
-                const bars = provider.provider === 'eodhd'
-                    ? await this.fetchEodhdBars(provider.symbol, startDate, endDate)
-                    : await this.fetchYahooBars(provider.symbol, startDate, endDate);
+                const latestStored = await prisma.marketPriceBar.findFirst({
+                    where: { listingId: listing.id, source: provider.provider },
+                    orderBy: { date: 'desc' },
+                    select: { date: true },
+                });
+                const incrementalStart = latestStored ? asDateOnly(latestStored.date) : new Date(startDate);
+                if (latestStored) incrementalStart.setUTCDate(incrementalStart.getUTCDate() - 7);
 
-                if (bars.length === 0) {
+                const bars = provider.provider === 'eodhd'
+                    ? await this.fetchEodhdBars(provider.symbol, incrementalStart, endDate)
+                    : await this.fetchYahooBars(provider.symbol, incrementalStart, endDate);
+
+                if (bars.length === 0 && !latestStored) {
                     throw new Error('The provider returned no historical prices');
                 }
 
-                const inserted = await prisma.marketPriceBar.createMany({
-                    data: bars.map((bar) => ({
-                        listingId: listing.id,
+                for (const bar of bars) {
+                    const data = {
                         ...bar,
                         currency: identity.currency,
                         source: provider.provider,
-                    })),
-                    skipDuplicates: true,
-                });
+                    };
+                    await prisma.marketPriceBar.upsert({
+                        where: {
+                            listingId_date_source: {
+                                listingId: listing.id,
+                                date: bar.date,
+                                source: provider.provider,
+                            },
+                        },
+                        create: { listingId: listing.id, ...data },
+                        update: data,
+                    });
+                }
                 result.instruments += 1;
-                result.priceBars += inserted.count;
+                result.priceBars += bars.length;
             } catch (error) {
                 result.failures.push({
                     symbol: identity.symbol,
                     reason: error instanceof Error ? error.message : String(error),
                 });
             }
-        }
+        });
 
-        result.fxRates = await this.syncEcbUsdEurRates(startDate, endDate);
+        try {
+            const latestFx = await prisma.marketFxRate.findFirst({
+                where: { baseCurrency: Currency.USD, quoteCurrency: Currency.EUR, source: 'ecb' },
+                orderBy: { date: 'desc' },
+                select: { date: true },
+            });
+            const fxStart = latestFx ? asDateOnly(latestFx.date) : new Date(startDate);
+            if (latestFx) fxStart.setUTCDate(fxStart.getUTCDate() - 7);
+            result.fxRates = await this.syncEcbUsdEurRates(fxStart, endDate);
+        } catch (error) {
+            result.failures.push({
+                symbol: 'USD/EUR',
+                reason: error instanceof Error ? error.message : String(error),
+            });
+        }
+        result.completedAt = new Date().toISOString();
+        result.status = result.failures.length > 0 ? 'partial' : 'ok';
         return result;
     }
 
@@ -249,7 +312,7 @@ export class MarketDataService {
         url.searchParams.set('to', formatDate(endDate));
         url.searchParams.set('order', 'a');
 
-        const response = await fetch(url, { signal: AbortSignal.timeout(20_000) });
+        const response = await fetch(url, { signal: AbortSignal.timeout(12_000) });
         if (!response.ok) throw new Error(`EODHD returned HTTP ${response.status}`);
         const payload = await response.json() as Array<{
             date?: string;
@@ -282,7 +345,8 @@ export class MarketDataService {
         url.searchParams.set('startPeriod', formatDate(startDate));
         url.searchParams.set('endPeriod', formatDate(endDate));
         url.searchParams.set('format', 'csvdata');
-        const response = await fetch(url, { signal: AbortSignal.timeout(20_000) });
+        url.searchParams.set('detail', 'dataonly');
+        const response = await fetch(url, { signal: AbortSignal.timeout(12_000) });
         if (!response.ok) throw new Error(`ECB returned HTTP ${response.status}`);
         const rows = (await response.text()).trim().split(/\r?\n/);
         if (rows.length < 2) return 0;
@@ -304,8 +368,21 @@ export class MarketDataService {
                 source: 'ecb',
             }];
         });
-        const inserted = await prisma.marketFxRate.createMany({ data: rates, skipDuplicates: true });
-        return inserted.count;
+        for (const rate of rates) {
+            await prisma.marketFxRate.upsert({
+                where: {
+                    date_baseCurrency_quoteCurrency_source: {
+                        date: rate.date,
+                        baseCurrency: rate.baseCurrency,
+                        quoteCurrency: rate.quoteCurrency,
+                        source: rate.source,
+                    },
+                },
+                create: rate,
+                update: { rate: rate.rate },
+            });
+        }
+        return rates.length;
     }
 }
 

@@ -2,7 +2,8 @@ import { Request, Response, NextFunction } from 'express';
 
 export const requestLogger = (req: Request, res: Response, next: NextFunction) => {
     const start = Date.now();
-    const { method, url } = req;
+    const method = req.method;
+    const url = req.path; // OAuth codes and state must not be logged.
 
     res.on('finish', () => {
         const duration = Date.now() - start;
