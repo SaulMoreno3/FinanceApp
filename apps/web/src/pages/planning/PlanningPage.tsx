@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
-import { Plus, RefreshCw, ArrowUpRight, Check, Pencil } from 'lucide-react';
+import { Plus, RefreshCw, ArrowUpRight, Check, Pencil, ChevronLeft, ChevronRight } from 'lucide-react';
 import { fetchAPI } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { RecurringForm, TransactionForm } from './PlanningForms';
 import { money, dateLabel, cadences, monthlyFactor, type Overview, type Plan, type Recurring, type Movement, type Candidate } from './planning.types';
@@ -14,9 +15,15 @@ function Empty({children}:{children:ReactNode}){return <p className="rounded-xl 
 function Panel({title,children}:{title:string;children:ReactNode}){return <section className="space-y-4 rounded-xl border p-5"><h3 className="font-medium">{title}</h3>{children}</section>;}
 function Bars({items}:{items:{name:string;amount:number}[]}){const max=Math.max(1,...items.map(i=>i.amount));return <div className="space-y-4">{items.map(i=><div key={i.name}><div className="mb-1 flex justify-between gap-4 text-sm"><span className="min-w-0 truncate" title={i.name}>{i.name}</span><span className="shrink-0 tabular-nums">{money(i.amount)}</span></div><div className="h-1.5 rounded-full bg-muted"><div className="h-1.5 rounded-full bg-primary/70" style={{width:`${i.amount/max*100}%`}}/></div></div>)}{!items.length&&<p className="text-sm text-muted-foreground">Sin gastos registrados.</p>}</div>;}
 const freshRecurring=(today:string):Recurring=>({id:crypto.randomUUID(),name:'',amount:0,currency:'EUR',kind:'SUBSCRIPTION',cadence:'MONTHLY',nextDate:today,endDate:null,active:true,merchantKey:null,notes:''});
+const validMonth=(value:string)=>/^\d{4}-(0[1-9]|1[0-2])$/.test(value)&&value>='2000-01';
+const shiftMonth=(month:string,offset:number)=>{const [year,number]=month.split('-').map(Number);return new Date(Date.UTC(year,number-1+offset,1)).toISOString().slice(0,7);};
+const monthLabel=(month:string)=>{const label=new Intl.DateTimeFormat('es-ES',{month:'long',year:'numeric',timeZone:'UTC'}).format(new Date(`${month}-01T00:00:00Z`));return label.charAt(0).toLocaleUpperCase('es-ES')+label.slice(1);};
 export default function PlanningPage(){
  const [params,setParams]=useSearchParams(),tab=params.get('tab')??'expenses';
- const [month,setMonth]=useState(new Date().toISOString().slice(0,7));
+ const today=new Date(),currentMonth=`${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}`;
+ const requestedMonth=params.get('month');
+ const month=requestedMonth&&validMonth(requestedMonth)&&requestedMonth<=currentMonth?requestedMonth:currentMonth;
+ const setMonth=(value:string)=>{if(!validMonth(value)||value>currentMonth)return;setParams(previous=>{const next=new URLSearchParams(previous);if(value===currentMonth)next.delete('month');else next.set('month',value);return next;});};
  const [data,setData]=useState<Overview|null>(null),[loading,setLoading]=useState(true),[busy,setBusy]=useState(false),[error,setError]=useState<string|null>(null),[notice,setNotice]=useState<string|null>(null);
  const [modal,setModal]=useState<{kind:'recurring';value:Recurring}|{kind:'transaction';value:Movement}|null>(null);
  const [reserve,setReserve]=useState('0'),[variable,setVariable]=useState('0'),[showReviewed,setShowReviewed]=useState(false),[search,setSearch]=useState(''),[page,setPage]=useState(1);
@@ -32,9 +39,24 @@ export default function PlanningPage(){
  const a=data?.analysis,active=data?.recurring.filter(r=>r.active&&r.kind==='SUBSCRIPTION'&&(!r.endDate||r.endDate>=data.today))??[];
  const monthly=active.filter(r=>r.currency==='EUR').reduce((n,r)=>n+r.amount*monthlyFactor[r.cadence],0);
  const filtered=a?.transactions.filter(t=>[t.description,t.merchantName,t.displayCategory].join(' ').toLowerCase().includes(search.toLowerCase()))??[];
+ const historyStart=data?.coverage.firstDate?.slice(0,7);
+ const earliestMonth=[historyStart&&validMonth(historyStart)?historyStart:shiftMonth(currentMonth,-11),month].sort()[0];
+ const monthGroups=new Map<string,string[]>();
+ for(let option=currentMonth;option>=earliestMonth;option=shiftMonth(option,-1)){const year=option.slice(0,4);monthGroups.set(year,[...(monthGroups.get(year)??[]),option]);}
  return <div className="mx-auto max-w-7xl space-y-6 p-4 text-foreground md:p-8">
-  <header className="flex flex-wrap items-center justify-between gap-4"><div><h2 className="text-2xl font-semibold tracking-tight">Mi planificación</h2><p className="mt-1 text-sm text-muted-foreground">Entiende tus gastos y anticipa lo que viene.</p></div><div className="flex items-center gap-2"><Label className="sr-only" htmlFor="planning-month">Mes del análisis</Label><Input id="planning-month" className="w-40" type="month" min="2000-01" max={new Date().toISOString().slice(0,7)} value={month} disabled={busy} onChange={e=>{if(e.target.value)setMonth(e.target.value);}}/><Button aria-label="Actualizar planificación" variant="outline" size="icon" disabled={busy||loading} onClick={()=>void load()}><RefreshCw className={`h-4 w-4 ${loading?'animate-spin':''}`}/></Button></div></header>
-  <nav aria-label="Planificación financiera" className="flex flex-wrap gap-1 border-b pb-3">{tabs.map(([key,label])=><Button key={key} size="sm" variant={tab===key?'secondary':'ghost'} aria-pressed={tab===key} onClick={()=>setParams({tab:key})}>{label}{key==='pending'&&data&&data.issues.some(i=>!i.acknowledged)&&<span className="ml-1 rounded-full bg-muted px-1.5 text-xs">{data.issues.filter(i=>!i.acknowledged).length}</span>}</Button>)}</nav>
+  <header className="flex flex-wrap items-center justify-between gap-4">
+   <div><h2 className="text-2xl font-semibold tracking-tight">Mi planificación</h2><p className="mt-1 text-sm text-muted-foreground">Entiende tus gastos y anticipa lo que viene.</p></div>
+   <div role="group" aria-label="Mes del análisis" className="flex w-full min-w-0 items-center gap-1.5 sm:w-auto sm:gap-2">
+    <Button aria-label="Mes anterior" title="Mes anterior" variant="outline" size="icon" className="h-11 w-11 shrink-0" disabled={busy||month<=earliestMonth} onClick={()=>setMonth(shiftMonth(month,-1))}><ChevronLeft className="h-4 w-4"/></Button>
+    <Select value={month} onValueChange={setMonth} disabled={busy}>
+     <SelectTrigger id="planning-month" aria-label="Seleccionar mes del análisis" className="h-11 min-w-0 flex-1 sm:w-[200px] sm:flex-none"><SelectValue/></SelectTrigger>
+     <SelectContent>{[...monthGroups].map(([year,months])=><SelectGroup key={year}><SelectLabel>{year}</SelectLabel>{months.map(option=><SelectItem key={option} value={option}>{monthLabel(option)}</SelectItem>)}</SelectGroup>)}</SelectContent>
+    </Select>
+    <Button aria-label="Mes siguiente" title="Mes siguiente" variant="outline" size="icon" className="h-11 w-11 shrink-0" disabled={busy||month>=currentMonth} onClick={()=>setMonth(shiftMonth(month,1))}><ChevronRight className="h-4 w-4"/></Button>
+    <Button aria-label="Actualizar planificación" title="Actualizar planificación" variant="outline" size="icon" className="h-11 w-11 shrink-0" disabled={busy||loading} onClick={()=>void load()}><RefreshCw className={`h-4 w-4 ${loading?'animate-spin':''}`}/></Button>
+   </div>
+  </header>
+  <nav aria-label="Planificación financiera" className="flex flex-wrap gap-1 border-b pb-3">{tabs.map(([key,label])=><Button key={key} size="sm" variant={tab===key?'secondary':'ghost'} aria-pressed={tab===key} onClick={()=>setParams(previous=>{const next=new URLSearchParams(previous);next.set('tab',key);return next;})}>{label}{key==='pending'&&data&&data.issues.some(i=>!i.acknowledged)&&<span className="ml-1 rounded-full bg-muted px-1.5 text-xs">{data.issues.filter(i=>!i.acknowledged).length}</span>}</Button>)}</nav>
   {error&&<div role="alert" className="rounded-lg border border-destructive/40 p-4 text-sm">{error}<Button className="ml-3" variant="outline" size="sm" disabled={busy||loading} onClick={()=>void load()}>Recargar datos</Button></div>}
   {notice&&<p role="status" className="flex items-center gap-2 text-sm"><Check className="h-4 w-4"/>{notice}</p>}
   {loading?<p role="status" className="py-20 text-center text-sm text-muted-foreground">Analizando movimientos…</p>:data&&a?<>
